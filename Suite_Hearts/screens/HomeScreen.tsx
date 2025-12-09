@@ -2,6 +2,8 @@ import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import ProfileScreen from './ProfileScreen';
+import ChatScreen from './ChatScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -29,21 +31,7 @@ function SwipeScreen() {
   );
 }
 
-function ChatScreen() {
-  return (
-    <View style={styles.screenContainer}>
-      <Text>Chat Screen</Text>
-    </View>
-  );
-}
-
-function ProfileScreen() {
-  return (
-    <View style={styles.screenContainer}>
-      <Text>Profile Screen</Text>
-    </View>
-  );
-}
+// ChatScreen and ProfileScreen are now imported from separate files
 
 export default function HomeScreen() {
   return (
@@ -66,8 +54,12 @@ export default function HomeScreen() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: 'tomato',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#FF6B35', // Orange
+        tabBarInactiveTintColor: '#A68B7B', // Muted espresso
+        tabBarStyle: {
+          backgroundColor: '#FFF5E1', // Beige
+          borderTopColor: '#E8D5C4', // Light beige
+        },
       })}
     >
       <Tab.Screen name="Search" component={SearchScreen} />
