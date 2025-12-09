@@ -16,9 +16,10 @@ interface UserContextType {
     searchersHousing: User[];
     searchersBoth: User[];
   };
-  sendMessage: (senderId: string, receiverId: string, text: string) => Promise<void>;
+  sendMessage: (senderId: string, receiverId: string, text: string, imageUrl?: string) => Promise<void>;
   getConversation: (userId1: string, userId2: string) => Conversation | undefined;
   getConversationsForUser: (userId: string) => Conversation[];
+  deleteUser: (userId: string) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -141,12 +142,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   };
 
-  const sendMessage = async (senderId: string, receiverId: string, text: string) => {
+  const sendMessage = async (senderId: string, receiverId: string, text: string, imageUrl?: string) => {
     const message: Message = {
       id: `${Date.now()}-${Math.random()}`,
       senderId,
       receiverId,
       text,
+      imageUrl,
       timestamp: Date.now(),
     };
 
@@ -181,6 +183,35 @@ export function UserProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(updatedConversations));
   };
 
+  const deleteUser = async (userId: string) => {
+    // Remove user from local state
+    const updatedUsers = users.filter(user => user.id !== userId);
+    setUsers(updatedUsers);
+    
+    // Remove conversations involving this user
+    const updatedConversations = conversations.filter(
+      conv => !conv.participants.includes(userId)
+    );
+    setConversations(updatedConversations);
+    
+    // Clear current user if it's the deleted user
+    if (currentUser?.id === userId) {
+      setCurrentUserState(null);
+      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    }
+    
+    // Update storage
+    await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
+    await AsyncStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(updatedConversations));
+    
+    // TODO: Delete from Supabase
+    // await supabase.from('users').delete().eq('id', userId);
+    // await supabase.from('messages').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+    // await supabase.from('conversations').delete().contains('participants', [userId]);
+    // await supabase.from('swipes').delete().or(`swiper_id.eq.${userId},swiped_id.eq.${userId}`);
+    // await supabase.from('matches').delete().or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+  };
+
   return (
     <UserContext.Provider
       value={{
@@ -195,6 +226,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         sendMessage,
         getConversation,
         getConversationsForUser,
+        deleteUser,
       }}
     >
       {children}

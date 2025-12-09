@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, FlatList, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,44 +22,111 @@ export default function ChatScreen() {
 
   const conversations = getConversationsForUser(currentUser.id);
 
+  const formatTimestamp = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    const diffTime = today.getTime() - messageDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      // Today - show time
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString([], { weekday: 'short' });
+    } else {
+      return date.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    }
+  };
+
   const renderConversation = ({ item }: { item: any }) => {
     const otherUserId = item.participants.find((id: string) => id !== currentUser.id);
     const otherUser = getUserById(otherUserId);
     
     if (!otherUser) return null;
 
+    const hasMessages = item.lastMessage;
+    const lastMessageText = hasMessages 
+      ? (item.lastMessage.imageUrl ? '📷 Photo' : item.lastMessage.text)
+      : null;
+
     return (
       <TouchableOpacity
         style={styles.conversationItem}
         onPress={() => navigation.navigate('Conversation', { userId: otherUser.id, userName: otherUser.name })}
+        activeOpacity={0.7}
       >
         <View style={styles.conversationContent}>
-          <View style={styles.avatar}>
+          {/* Profile Photo */}
+          <View style={styles.avatarContainer}>
             {otherUser.profilePicture ? (
-              <Text style={styles.avatarText}>{otherUser.name[0]}</Text>
+              <Image 
+                source={{ uri: otherUser.profilePicture }} 
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
             ) : (
-              <Ionicons name="person" size={24} color="#FFF5E1" />
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{otherUser.name[0].toUpperCase()}</Text>
+              </View>
             )}
           </View>
+
+          {/* Conversation Info */}
           <View style={styles.conversationInfo}>
-            <Text style={styles.conversationName}>{otherUser.name}</Text>
-            {item.lastMessage && (
+            <View style={styles.conversationHeader}>
+              <Text style={styles.conversationName} numberOfLines={1}>
+                {otherUser.name}
+              </Text>
+              {hasMessages && (
+                <Text style={styles.timestamp}>
+                  {formatTimestamp(item.lastMessage.timestamp)}
+                </Text>
+              )}
+            </View>
+            {hasMessages ? (
               <Text style={styles.lastMessage} numberOfLines={1}>
-                {item.lastMessage.text}
+                {lastMessageText}
+              </Text>
+            ) : (
+              <Text style={styles.startTalkingPrompt}>
+                Start talking
               </Text>
             )}
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#A68B7B" />
+        <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="ellipsis-horizontal-circle" size={24} color="#6F4E37" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="create-outline" size={24} color="#6F4E37" />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
+        <Text style={styles.searchPlaceholder}>Search</Text>
+        <Ionicons name="mic" size={20} color="#A68B7B" style={styles.micIcon} />
+      </View>
+
+      {/* Conversations List */}
       {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubbles-outline" size={64} color="#E8D5C4" />
@@ -72,6 +139,7 @@ export default function ChatScreen() {
           renderItem={renderConversation}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
     </View>
@@ -81,65 +149,124 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF5E1',
+    backgroundColor: '#FFFFFF', // White background like iMessage
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8D5C4',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: '#FFF5E1', // Cream header
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontSize: 34,
+    fontWeight: '700',
+    color: '#000000', // Black title like iMessage
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  headerButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7', // Light gray search bar
+    marginHorizontal: 16,
+    marginVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 8,
+  },
+  searchIcon: {
+    marginRight: 4,
+  },
+  searchPlaceholder: {
+    flex: 1,
+    fontSize: 16,
+    color: '#8E8E93',
+  },
+  micIcon: {
+    marginLeft: 4,
   },
   listContent: {
-    padding: 20,
+    paddingBottom: 20,
   },
   conversationItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E8D5C4',
   },
   conversationContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FF6B35',
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarContainer: {
     marginRight: 12,
   },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6F4E37', // Brown avatar background
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
   avatarText: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '600',
-    color: '#FFF5E1',
+    color: '#FFFFFF',
   },
   conversationInfo: {
     flex: 1,
+    justifyContent: 'center',
+  },
+  conversationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
   },
   conversationName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    color: '#6F4E37',
-    marginBottom: 4,
+    color: '#000000', // Black name
+    flex: 1,
+  },
+  timestamp: {
+    fontSize: 15,
+    color: '#8E8E93', // Gray timestamp
+    marginLeft: 8,
   },
   lastMessage: {
-    fontSize: 14,
-    color: '#A68B7B',
+    fontSize: 15,
+    color: '#8E8E93', // Gray message text
+    marginTop: 2,
+  },
+  startTalkingPrompt: {
+    fontSize: 15,
+    color: '#8E8E93',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  separator: {
+    height: 0.5,
+    backgroundColor: '#C6C6C8',
+    marginLeft: 84, // Align with message content (avatar + margin)
   },
   emptyContainer: {
     flex: 1,

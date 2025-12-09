@@ -1,10 +1,18 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
+import { RootStackParamList } from '../types';
+import { supabase } from '../lib/supabase';
+
+type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ProfileScreen() {
-  const { currentUser } = useUser();
+  const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const { currentUser, deleteUser } = useUser();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!currentUser) {
     return (
@@ -35,6 +43,49 @@ export default function ProfileScreen() {
     currentUser.hometown,
   ].filter(Boolean);
 
+  const handleDeleteProfile = () => {
+    Alert.alert(
+      'Delete Profile',
+      'Are you sure you want to delete your profile? This action cannot be undone and will remove all your data.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!currentUser) return;
+            
+            setIsDeleting(true);
+            try {
+              // Delete from Supabase
+              await supabase.from('users').delete().eq('id', currentUser.id);
+              await supabase.from('messages').delete().or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
+              await supabase.from('conversations').delete().contains('participants', [currentUser.id]);
+              await supabase.from('swipes').delete().or(`swiper_id.eq.${currentUser.id},swiped_id.eq.${currentUser.id}`);
+              await supabase.from('matches').delete().or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+              
+              // Delete from local storage
+              await deleteUser(currentUser.id);
+              
+              // Navigate back to sign up
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'SignUp' }],
+              });
+            } catch (error) {
+              console.error('Error deleting profile:', error);
+              Alert.alert('Error', 'Failed to delete profile. Please try again.');
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       {/* Header */}
@@ -57,9 +108,6 @@ export default function ProfileScreen() {
               <Ionicons name="person" size={60} color="#E8D5C4" />
             </View>
           )}
-          <TouchableOpacity style={styles.addPhotoButton}>
-            <Ionicons name="add" size={20} color="#FFF5E1" />
-          </TouchableOpacity>
         </View>
 
         {/* Status and Bio */}
@@ -104,6 +152,18 @@ export default function ProfileScreen() {
           </View>
         </>
       )}
+
+      {/* Delete Profile Button */}
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={handleDeleteProfile}
+        disabled={isDeleting}
+      >
+        <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.deleteButtonText}>
+          {isDeleting ? 'Deleting...' : 'Delete Profile'}
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -170,19 +230,6 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  addPhotoButton: {
-    position: 'absolute',
-    bottom: -8,
-    right: -8,
-    backgroundColor: '#FF6B35', // Orange
-    borderRadius: 16,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#000000',
   },
   infoSection: {
     flex: 1,
@@ -251,6 +298,23 @@ const styles = StyleSheet.create({
     color: '#6F4E37',
     textAlign: 'center',
     marginTop: 100,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DC3545', // Red
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    marginTop: 20,
+    marginBottom: 40,
+    gap: 8,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

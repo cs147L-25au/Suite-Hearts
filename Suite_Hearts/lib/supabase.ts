@@ -15,11 +15,11 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 // ============================================
 
-if (!SUPABASE_URL || SUPABASE_URL === 'YOUR_SUPABASE_PROJECT_URL') {
+if (!SUPABASE_URL || SUPABASE_URL.trim() === '' || SUPABASE_URL.includes('xxxxxxxxxxxxx')) {
   throw new Error('Missing Supabase URL. Please add your Supabase project URL in lib/supabase.ts');
 }
 
-if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.trim() === '' || SUPABASE_ANON_KEY.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...')) {
   throw new Error('Missing Supabase Anon Key. Please add your Supabase anon key in lib/supabase.ts');
 }
 

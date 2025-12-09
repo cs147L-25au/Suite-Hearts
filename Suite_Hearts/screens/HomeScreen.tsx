@@ -4,6 +4,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import ProfileScreen from './ProfileScreen';
 import ChatScreen from './ChatScreen';
+import MapScreen from './MapScreen';
+import SwipeScreen from './SwipeScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -15,23 +17,7 @@ function SearchScreen() {
   );
 }
 
-function MapScreen() {
-  return (
-    <View style={styles.screenContainer}>
-      <Text>Map Screen</Text>
-    </View>
-  );
-}
-
-function SwipeScreen() {
-  return (
-    <View style={styles.screenContainer}>
-      <Text>Swipe Screen</Text>
-    </View>
-  );
-}
-
-// ChatScreen and ProfileScreen are now imported from separate files
+// MapScreen, SwipeScreen, ChatScreen and ProfileScreen are now imported from separate files
 
 export default function HomeScreen() {
   return (
