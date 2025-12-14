@@ -520,6 +520,14 @@ export default function SignUpScreen({ navigation }: Props) {
                 </View>
               )}
             </TouchableOpacity>
+            {!formData.profilePicture && (
+              <TouchableOpacity
+                style={styles.skipImageButton}
+                onPress={handleNext}
+              >
+                <Text style={styles.skipImageButtonText}>Skip for now</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : currentQuestion.type === 'age' ? (
           renderDropdown(ageOptions, value, (selected) => updateFormData(currentQuestion.key, selected))
@@ -597,12 +605,12 @@ export default function SignUpScreen({ navigation }: Props) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.navButton, styles.nextButton, (!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)) && styles.navButtonDisabled]}
+            style={[styles.navButton, styles.nextButton, !bioValid && styles.navButtonDisabled]}
             onPress={handleNext}
-            disabled={!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)}
+            disabled={!bioValid}
           >
-            <Text style={[styles.navButtonText, styles.nextButtonText, (!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)) && styles.navButtonTextDisabled]}>Next</Text>
-            <Ionicons name="chevron-forward" size={24} color={(!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)) ? '#D3D3D3' : '#FFF5E1'} />
+            <Text style={[styles.navButtonText, styles.nextButtonText, !bioValid && styles.navButtonTextDisabled]}>Next</Text>
+            <Ionicons name="chevron-forward" size={24} color={!bioValid ? '#D3D3D3' : '#FFF5E1'} />
           </TouchableOpacity>
         </View>
 
@@ -975,5 +983,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6F4E37',
     textDecorationLine: 'underline',
+  },
+  skipImageButton: {
+    backgroundColor: '#FF6B35',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  skipImageButtonText: {
+    color: '#FFF5E1',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
