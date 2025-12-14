@@ -251,6 +251,50 @@ export default function SignUpScreen({ navigation }: Props) {
     navigation.navigate('Home');
   };
 
+  const handleFinishLater = async () => {
+    // Create a minimal user profile with current data and skip to Home
+    const newUser: User = {
+      id: `${Date.now()}-${Math.random()}`,
+      userType: userType as 'homeowner' | 'searcher',
+      lookingFor: userType === 'searcher' ? (lookingFor as 'roommates' | 'housing' | 'both' || 'roommates') : undefined,
+      email: formData.email || '',
+      phone: formData.phone || '',
+      name: formData.name || 'User',
+      age: formData.age || '25',
+      race: formData.race || '',
+      gender: formData.gender || '',
+      university: userType === 'searcher' ? formData.university : undefined,
+      yearsExperience: userType === 'homeowner' ? formData.yearsExperience : undefined,
+      job: formData.job || '',
+      profilePicture: formData.profilePicture,
+      hometown: formData.hometown || '',
+      location: formData.location || '',
+      pets: userType === 'searcher' ? formData.pets : undefined,
+      smoking: formData.smoking || '',
+      drinking: formData.drinking || '',
+      drugs: formData.drugs || '',
+      nightOwl: formData.nightOwl || '',
+      religion: formData.religion || '',
+      bio: formData.bio || '',
+      questions: formData.questions,
+      // New housing preferences with defaults
+      maxRoommates: undefined,
+      roommateType: undefined,
+      preferredCity: undefined,
+      preferredLatitude: undefined,
+      preferredLongitude: undefined,
+      spaceType: undefined,
+      minBudget: undefined,
+      maxBudget: undefined,
+      leaseDuration: undefined,
+      createdAt: Date.now(),
+    };
+
+    await addUser(newUser);
+    await setCurrentUser(newUser);
+    navigation.navigate('Home');
+  };
+
   const handleBack = () => {
     if (step === 0) {
       // Go back to Introduction screen
@@ -551,7 +595,7 @@ export default function SignUpScreen({ navigation }: Props) {
             <Ionicons name="chevron-back" size={24} color="#6F4E37" />
             <Text style={[styles.navButtonText, styles.backButtonText]}>Back</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.navButton, styles.nextButton, (!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)) && styles.navButtonDisabled]}
             onPress={handleNext}
@@ -561,6 +605,14 @@ export default function SignUpScreen({ navigation }: Props) {
             <Ionicons name="chevron-forward" size={24} color={(!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)) ? '#D3D3D3' : '#FFF5E1'} />
           </TouchableOpacity>
         </View>
+
+        {/* Finish Later Link */}
+        <TouchableOpacity
+          style={styles.finishLaterContainer}
+          onPress={handleFinishLater}
+        >
+          <Text style={styles.finishLaterText}>finish later</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -914,5 +966,14 @@ const styles = StyleSheet.create({
   wordCountError: {
     color: '#FF6B35',
     fontWeight: '600',
+  },
+  finishLaterContainer: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  finishLaterText: {
+    fontSize: 16,
+    color: '#6F4E37',
+    textDecorationLine: 'underline',
   },
 });
