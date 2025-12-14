@@ -1,0 +1,538 @@
+{
+  "properties": [
+    {
+      "id": 1,
+      "address": "742 University Avenue, Apt 204",
+      "city": "San Jose",
+      "state": "CA",
+      "zipCode": "95126",
+      "price": 2100,
+      "beds": 2,
+      "baths": 1,
+      "sqft": 850,
+      "yearBuilt": 2015,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "sublet",
+      "availabilityDates": "Available for sublet from 06/15/25 - 08/31/25",
+      "imageUrl": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1502672260066-6bc35f0af07e?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop"
+      ],
+      "description": "Modern 2-bedroom apartment near SJSU campus. Perfect for summer sublet. Furnished option available.",
+      "features": [
+        "In-unit laundry",
+        "Parking included",
+        "Furnished",
+        "WiFi included"
+      ],
+      "utilities": "Water and trash included",
+      "petPolicy": "No pets",
+      "listingDate": "2024-12-10",
+      "landlord": {
+        "name": "Sarah Johnson",
+        "phone": "(408) 555-0123",
+        "email": "sarah@studenthousing.com"
+      }
+    },
+    {
+      "id": 2,
+      "address": "456 College Drive, Unit 3B",
+      "city": "Santa Clara",
+      "state": "CA",
+      "zipCode": "95051",
+      "price": 1850,
+      "beds": 1,
+      "baths": 1,
+      "sqft": 650,
+      "yearBuilt": 2018,
+      "propertyType": "Studio",
+      "status": "Available",
+      "availabilityType": "rental",
+      "availabilityDates": "Available to rent starting 01/15/25",
+      "imageUrl": "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=600&fit=crop"
+      ],
+      "description": "Cozy studio apartment walking distance to SCU. Quiet building with study lounge.",
+      "features": [
+        "Study lounge",
+        "Bike storage",
+        "Package lockers",
+        "On-site gym"
+      ],
+      "utilities": "Tenant pays electric and gas",
+      "petPolicy": "Cats allowed with deposit",
+      "listingDate": "2024-12-08",
+      "landlord": {
+        "name": "Mike Chen",
+        "phone": "(408) 555-0456",
+        "email": "mike@campusapts.com"
+      }
+    },
+    {
+      "id": 3,
+      "address": "789 Student Lane, Apt 12",
+      "city": "Palo Alto",
+      "state": "CA",
+      "zipCode": "94301",
+      "price": 2800,
+      "beds": 3,
+      "baths": 2,
+      "sqft": 1200,
+      "yearBuilt": 2020,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "sublet",
+      "availabilityDates": "Available for sublet from 03/20/25 - 06/15/25",
+      "imageUrl": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=800&h=600&fit=crop"
+      ],
+      "description": "Spacious 3-bedroom near Stanford. Spring quarter sublet. Great for study groups.",
+      "features": [
+        "Dishwasher",
+        "Central AC",
+        "Balcony",
+        "High-speed internet"
+      ],
+      "utilities": "All utilities included",
+      "petPolicy": "No pets",
+      "listingDate": "2024-12-05",
+      "landlord": {
+        "name": "Jennifer Lee",
+        "phone": "(650) 555-0789",
+        "email": "jennifer@stanfordrentals.com"
+      }
+    },
+    {
+      "id": 4,
+      "address": "321 Campus Circle, #5A",
+      "city": "Mountain View",
+      "state": "CA",
+      "zipCode": "94040",
+      "price": 1950,
+      "beds": 1,
+      "baths": 1,
+      "sqft": 700,
+      "yearBuilt": 2016,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "rental",
+      "availabilityDates": "Available to rent starting 02/01/25",
+      "imageUrl": "https://images.unsplash.com/photo-1502672260066-6bc35f0af07e?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1502672260066-6bc35f0af07e?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=800&h=600&fit=crop"
+      ],
+      "description": "One bedroom near Caltrain station. Perfect for grad students or interns.",
+      "features": ["Walk to Caltrain", "Pool", "Fitness center", "Study room"],
+      "utilities": "Water and trash included",
+      "petPolicy": "Small dogs allowed",
+      "listingDate": "2024-12-12",
+      "landlord": {
+        "name": "David Martinez",
+        "phone": "(650) 555-0321",
+        "email": "david@mvrentals.com"
+      }
+    },
+    {
+      "id": 5,
+      "address": "654 Scholar Street, Unit 8",
+      "city": "Sunnyvale",
+      "state": "CA",
+      "zipCode": "94086",
+      "price": 1600,
+      "beds": 1,
+      "baths": 1,
+      "sqft": 600,
+      "yearBuilt": 2012,
+      "propertyType": "Studio",
+      "status": "Available",
+      "availabilityType": "sublet",
+      "availabilityDates": "Available for sublet from 07/01/25 - 09/30/25",
+      "imageUrl": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=800&h=600&fit=crop"
+      ],
+      "description": "Affordable studio for summer quarter. Close to De Anza College and tech companies.",
+      "features": [
+        "AC",
+        "On-site laundry",
+        "Parking spot",
+        "Quiet hours enforced"
+      ],
+      "utilities": "Tenant pays all utilities",
+      "petPolicy": "No pets",
+      "listingDate": "2024-12-11",
+      "landlord": {
+        "name": "Amy Wong",
+        "phone": "(408) 555-0654",
+        "email": "amy@sunnyvalestudentliving.com"
+      }
+    },
+    {
+      "id": 6,
+      "address": "159 Graduate Avenue, Apt 301",
+      "city": "Los Gatos",
+      "state": "CA",
+      "zipCode": "95032",
+      "price": 2400,
+      "beds": 2,
+      "baths": 2,
+      "sqft": 950,
+      "yearBuilt": 2019,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "rental",
+      "availabilityDates": "Available to rent starting 01/01/25",
+      "imageUrl": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800&h=600&fit=crop"
+      ],
+      "description": "Luxury 2-bed/2-bath apartment in quiet area. Great for focused studying.",
+      "features": [
+        "In-unit W/D",
+        "Granite counters",
+        "Walk-in closets",
+        "Reserved parking"
+      ],
+      "utilities": "Water included",
+      "petPolicy": "Cats allowed",
+      "listingDate": "2024-11-28",
+      "landlord": {
+        "name": "Robert Kim",
+        "phone": "(408) 555-0987",
+        "email": "robert@lgapartments.com"
+      }
+    },
+    {
+      "id": 7,
+      "address": "2468 Dorm Drive, #102",
+      "city": "Cupertino",
+      "state": "CA",
+      "zipCode": "95014",
+      "price": 2200,
+      "beds": 2,
+      "baths": 1,
+      "sqft": 800,
+      "yearBuilt": 2017,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "sublet",
+      "availabilityDates": "Available for sublet from 05/20/25 - 08/20/25",
+      "imageUrl": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1502672260066-6bc35f0af07e?w=800&h=600&fit=crop"
+      ],
+      "description": "Summer sublet near De Anza. Furnished bedrooms, shared living space.",
+      "features": ["Furnished", "Pool access", "Study room", "Fast WiFi"],
+      "utilities": "All included",
+      "petPolicy": "No pets",
+      "listingDate": "2024-12-09",
+      "landlord": {
+        "name": "Lisa Patel",
+        "phone": "(408) 555-0246",
+        "email": "lisa@cupertinohousing.com"
+      }
+    },
+    {
+      "id": 8,
+      "address": "1357 Sophomore Street, Unit 4C",
+      "city": "Fremont",
+      "state": "CA",
+      "zipCode": "94538",
+      "price": 1700,
+      "beds": 1,
+      "baths": 1,
+      "sqft": 650,
+      "yearBuilt": 2014,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "rental",
+      "availabilityDates": "Available to rent starting 03/01/25",
+      "imageUrl": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=600&fit=crop"
+      ],
+      "description": "Budget-friendly 1-bedroom near Ohlone College. Great for students on a budget.",
+      "features": [
+        "On-site laundry",
+        "Parking",
+        "Bus stop nearby",
+        "Bike storage"
+      ],
+      "utilities": "Tenant pays electric",
+      "petPolicy": "No pets",
+      "listingDate": "2024-12-07",
+      "landlord": {
+        "name": "Tom Anderson",
+        "phone": "(510) 555-0135",
+        "email": "tom@fremontrentals.com"
+      }
+    },
+    {
+      "id": 9,
+      "address": "987 Academic Avenue, Apt 7D",
+      "city": "San Mateo",
+      "state": "CA",
+      "zipCode": "94402",
+      "price": 2300,
+      "beds": 2,
+      "baths": 1.5,
+      "sqft": 900,
+      "yearBuilt": 2016,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "sublet",
+      "availabilityDates": "Available for sublet from 01/10/25 - 03/15/25",
+      "imageUrl": "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&h=600&fit=crop"
+      ],
+      "description": "Winter quarter sublet. Walking distance to CSM and downtown shops.",
+      "features": ["Dishwasher", "Balcony", "Gym access", "Package room"],
+      "utilities": "Water and trash included",
+      "petPolicy": "No pets during sublet",
+      "listingDate": "2024-11-30",
+      "landlord": {
+        "name": "Emily Tran",
+        "phone": "(650) 555-0876",
+        "email": "emily@smhousing.com"
+      }
+    },
+    {
+      "id": 10,
+      "address": "753 Freshman Way, #201",
+      "city": "Milpitas",
+      "state": "CA",
+      "zipCode": "95035",
+      "price": 1550,
+      "beds": 1,
+      "baths": 1,
+      "sqft": 550,
+      "yearBuilt": 2011,
+      "propertyType": "Studio",
+      "status": "Available",
+      "availabilityType": "rental",
+      "availabilityDates": "Available to rent starting 12/20/24",
+      "imageUrl": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=800&h=600&fit=crop"
+      ],
+      "description": "Available now! Compact studio perfect for international students. Near Great Mall.",
+      "features": [
+        "Utilities included",
+        "Furnished option",
+        "Covered parking",
+        "Security"
+      ],
+      "utilities": "All utilities included",
+      "petPolicy": "No pets",
+      "listingDate": "2024-12-13",
+      "landlord": {
+        "name": "Kevin Nguyen",
+        "phone": "(408) 555-0753",
+        "email": "kevin@milpitasstudios.com"
+      }
+    },
+    {
+      "id": 11,
+      "address": "246 Junior Junction, Unit 5B",
+      "city": "Campbell",
+      "state": "CA",
+      "zipCode": "95008",
+      "price": 1900,
+      "beds": 2,
+      "baths": 1,
+      "sqft": 750,
+      "yearBuilt": 2013,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "sublet",
+      "availabilityDates": "Available for sublet from 06/01/25 - 08/31/25",
+      "imageUrl": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1502672260066-6bc35f0af07e?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=600&fit=crop"
+      ],
+      "description": "Summer sublet in downtown Campbell. Walk to cafes, library, and restaurants.",
+      "features": [
+        "Downtown location",
+        "Patio",
+        "On-site laundry",
+        "Bike-friendly"
+      ],
+      "utilities": "Water included",
+      "petPolicy": "Negotiable",
+      "listingDate": "2024-12-06",
+      "landlord": {
+        "name": "Maria Garcia",
+        "phone": "(408) 555-0246",
+        "email": "maria@campbellapts.com"
+      }
+    },
+    {
+      "id": 12,
+      "address": "890 Senior Street, Apt 401",
+      "city": "Saratoga",
+      "state": "CA",
+      "zipCode": "95070",
+      "price": 2600,
+      "beds": 2,
+      "baths": 2,
+      "sqft": 1000,
+      "yearBuilt": 2021,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "rental",
+      "availabilityDates": "Available to rent starting 02/15/25",
+      "imageUrl": "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800&h=600&fit=crop"
+      ],
+      "description": "Upscale apartment in quiet Saratoga. Perfect for grad students seeking peace.",
+      "features": [
+        "In-unit W/D",
+        "Luxury finishes",
+        "2 parking spots",
+        "Quiet complex"
+      ],
+      "utilities": "Trash and water included",
+      "petPolicy": "Cats and small dogs welcome",
+      "listingDate": "2024-12-04",
+      "landlord": {
+        "name": "William Chang",
+        "phone": "(408) 555-0890",
+        "email": "william@saratogaliving.com"
+      }
+    },
+    {
+      "id": 13,
+      "address": "135 Thesis Tower, #603",
+      "city": "Redwood City",
+      "state": "CA",
+      "zipCode": "94061",
+      "price": 2050,
+      "beds": 1,
+      "baths": 1,
+      "sqft": 720,
+      "yearBuilt": 2015,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "sublet",
+      "availabilityDates": "Available for sublet from 04/01/25 - 06/30/25",
+      "imageUrl": "https://images.unsplash.com/photo-1502672260066-6bc35f0af07e?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1502672260066-6bc35f0af07e?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=800&h=600&fit=crop"
+      ],
+      "description": "Spring quarter sublet near Caltrain. Easy commute to Stanford or SF.",
+      "features": [
+        "Walk to Caltrain",
+        "Rooftop deck",
+        "Gym",
+        "Coworking space"
+      ],
+      "utilities": "Water and WiFi included",
+      "petPolicy": "No pets",
+      "listingDate": "2024-12-02",
+      "landlord": {
+        "name": "Rachel Green",
+        "phone": "(650) 555-0135",
+        "email": "rachel@rwcstudenthousing.com"
+      }
+    },
+    {
+      "id": 14,
+      "address": "468 Bookworm Boulevard, Unit 2A",
+      "city": "Foster City",
+      "state": "CA",
+      "zipCode": "94404",
+      "price": 2150,
+      "beds": 2,
+      "baths": 1,
+      "sqft": 850,
+      "yearBuilt": 2018,
+      "propertyType": "Apartment",
+      "status": "Available",
+      "availabilityType": "rental",
+      "availabilityDates": "Available to rent starting 01/20/25",
+      "imageUrl": "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1484101403633-562f891dc89a?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=600&fit=crop"
+      ],
+      "description": "Waterfront community with lagoon access. Great for active students.",
+      "features": [
+        "Lagoon access",
+        "Bike paths",
+        "Community center",
+        "Quiet study areas"
+      ],
+      "utilities": "Water included",
+      "petPolicy": "Small pets allowed",
+      "listingDate": "2024-12-01",
+      "landlord": {
+        "name": "Daniel Park",
+        "phone": "(650) 555-0468",
+        "email": "daniel@fosterhousing.com"
+      }
+    },
+    {
+      "id": 15,
+      "address": "802 Library Lane, Apt 9",
+      "city": "Newark",
+      "state": "CA",
+      "zipCode": "94560",
+      "price": 1450,
+      "beds": 1,
+      "baths": 1,
+      "sqft": 580,
+      "yearBuilt": 2010,
+      "propertyType": "Studio",
+      "status": "Available",
+      "availabilityType": "sublet",
+      "availabilityDates": "Available for sublet from 07/15/25 - 09/15/25",
+      "imageUrl": "https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=800&h=600&fit=crop",
+      "images": [
+        "https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=800&h=600&fit=crop",
+        "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&h=600&fit=crop"
+      ],
+      "description": "Affordable summer sublet near BART. Perfect for summer internships.",
+      "features": [
+        "Near BART",
+        "Quiet building",
+        "Laundry room",
+        "Parking available"
+      ],
+      "utilities": "Tenant pays electric and gas",
+      "petPolicy": "No pets",
+      "listingDate": "2024-12-10",
+      "landlord": {
+        "name": "Sophia Rodriguez",
+        "phone": "(510) 555-0802",
+        "email": "sophia@newarkstudentliving.com"
+      }
+    }
+  ],
+  "savedProperties": [],
+  "searchHistory": []
+}
