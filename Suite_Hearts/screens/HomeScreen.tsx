@@ -170,7 +170,7 @@ function SearchScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>
-            {showSaved ? "Saved Properties" : "Properties for Sale"}
+            {showSaved ? "Saved Properties" : "Properties Available"}
           </Text>
           <Text style={styles.headerSubtitle}>
             {displayedProperties.length} listings
