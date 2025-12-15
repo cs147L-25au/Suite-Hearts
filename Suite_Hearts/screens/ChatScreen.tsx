@@ -364,23 +364,6 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search conversations, names, messages..."
-          placeholderTextColor="#8E8E93"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color="#A68B7B" />
-          </TouchableOpacity>
-        )}
-      </View>
-
       {/* Tab Navigator */}
       <Tab.Navigator
         tabBar={(props) => (
@@ -437,6 +420,22 @@ export default function ChatScreen() {
         <Tab.Screen name="Messages" options={{ tabBarLabel: 'Messages' }}>
           {() => (
             <View style={{ flex: 1 }}>
+              {/* Search Bar */}
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search conversations, names, messages..."
+                  placeholderTextColor="#8E8E93"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={20} color="#A68B7B" />
+                  </TouchableOpacity>
+                )}
+              </View>
               {filteredAllConversations.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Ionicons name="chatbubbles-outline" size={64} color="#E8D5C4" />
@@ -462,6 +461,22 @@ export default function ChatScreen() {
         <Tab.Screen name="Matches" options={{ tabBarLabel: 'Matches' }}>
           {() => (
             <View style={{ flex: 1 }}>
+              {/* Search Bar */}
+              <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search conversations, names, messages..."
+                  placeholderTextColor="#8E8E93"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={20} color="#A68B7B" />
+                  </TouchableOpacity>
+                )}
+              </View>
               {filteredMatchedConversations.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Ionicons name="heart-outline" size={64} color="#E8D5C4" />
