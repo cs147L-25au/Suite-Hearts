@@ -5,7 +5,7 @@
  */
 
 // Set to true to use local photos from assets folder instead of Picsum API
-const USE_LOCAL_PHOTOS = false;
+const USE_LOCAL_PHOTOS = true;
 
 // Local photo assets 
 const LOCAL_PHOTOS = [

@@ -904,6 +904,7 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [showRoommatePrompt, setShowRoommatePrompt] = useState(false);
   const [totalSwipes, setTotalSwipes] = useState(0);
+  const [expandedPhotoIndex, setExpandedPhotoIndex] = useState(0);
   const cardSwipeTriggerRef = useRef<((direction: 'left' | 'right') => void) | null>(null);
 
   if (listings.length === 0) {
@@ -1086,7 +1087,10 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
         visible={isExpanded}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setIsExpanded(false)}
+        onRequestClose={() => {
+          setIsExpanded(false);
+          setExpandedPhotoIndex(0); // Reset photo index when closing
+        }}
       >
         <View style={styles.expandedContainer}>
           {/* Back Button */}
@@ -1098,7 +1102,71 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
           </TouchableOpacity>
           <ScrollView style={styles.expandedScrollView} showsVerticalScrollIndicator={false}>
             {/* Photo Gallery with Swipe Support */}
-            <ExpandedPhotoGallery listing={currentListing} />
+            <View style={styles.expandedPhotoContainer}>
+              {(() => {
+                // Get photos: user-uploaded photos take priority, otherwise use random photos
+                const isExternalListing = !currentListing.ownerId || currentListing.ownerId === '';
+                const maxPhotos = isExternalListing ? 1 : 4;
+                const photos = currentListing.photos && currentListing.photos.length > 0 
+                  ? currentListing.photos.slice(0, maxPhotos)
+                  : getRandomRealEstatePhotos(currentListing.id, 1);
+                
+                const currentPhoto = photos[expandedPhotoIndex];
+                const photoUri = typeof currentPhoto === 'string' ? currentPhoto : 
+                  typeof currentPhoto === 'object' && currentPhoto.uri ? currentPhoto.uri :
+                  typeof currentPhoto === 'number' ? currentPhoto : null;
+
+                return (
+                  <>
+                    {photoUri ? (
+                      <>
+                        <Image
+                          source={typeof photoUri === 'string' ? { uri: photoUri } : photoUri}
+                          style={styles.expandedPhoto}
+                          resizeMode="cover"
+                        />
+                        {photos.length > 1 && (
+                          <>
+                            {expandedPhotoIndex > 0 && (
+                              <TouchableOpacity
+                                style={[styles.expandedPhotoNavButton, styles.expandedPhotoNavButtonLeft]}
+                                onPress={() => setExpandedPhotoIndex(expandedPhotoIndex - 1)}
+                              >
+                                <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                              </TouchableOpacity>
+                            )}
+                            {expandedPhotoIndex < photos.length - 1 && (
+                              <TouchableOpacity
+                                style={[styles.expandedPhotoNavButton, styles.expandedPhotoNavButtonRight]}
+                                onPress={() => setExpandedPhotoIndex(expandedPhotoIndex + 1)}
+                              >
+                                <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+                              </TouchableOpacity>
+                            )}
+                            <View style={styles.expandedPhotoIndicators}>
+                              {photos.map((_, index) => (
+                                <View
+                                  key={index}
+                                  style={[
+                                    styles.expandedPhotoIndicator,
+                                    index === expandedPhotoIndex && styles.expandedPhotoIndicatorActive,
+                                  ]}
+                                />
+                              ))}
+                            </View>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <View style={styles.expandedPhotoPlaceholder}>
+                        <Ionicons name="home" size={64} color="#E8D5C4" />
+                        <Text style={styles.expandedPhotoPlaceholderText}>No photo available</Text>
+                      </View>
+                    )}
+                  </>
+                );
+              })()}
+            </View>
 
             {/* Info Section */}
             <View style={styles.expandedInfoContainer}>
