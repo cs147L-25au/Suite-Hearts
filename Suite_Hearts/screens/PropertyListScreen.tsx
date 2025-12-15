@@ -337,10 +337,10 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
           </>
         )}
 
-        {/* Datafiniti Properties */}
-        {datafinitiListings.length > 0 && (
+        {/* External Properties */}
+        {externalListings.length > 0 && (
           <>
-            {(myListings.length > 0 || allUserListings.length > 0) && <Text style={styles.sectionTitle}>Datafiniti Listings</Text>}
+            {(myListings.length > 0 || allUserListings.length > 0) && <Text style={styles.sectionTitle}>External Listings</Text>}
             {externalListings.map((property) => (
           <TouchableOpacity
             key={property.id}

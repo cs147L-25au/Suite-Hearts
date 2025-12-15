@@ -1,10 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, FlatList, Image, TextInput, Alert, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList } from '../types';
+import { RootStackParamList, Conversation } from '../types';
 import { useUser } from '../context/UserContext';
+import { supabase } from '../lib/supabase';
+
+const Tab = createMaterialTopTabNavigator();
 
 type ChatScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -17,10 +21,59 @@ export default function ChatScreen() {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [selectedGroupMembers, setSelectedGroupMembers] = useState<Set<string>>(new Set());
+  const [matchedUserIds, setMatchedUserIds] = useState<Set<string>>(new Set());
+
+  // Fetch matches from Supabase
+  useEffect(() => {
+    const fetchMatches = async () => {
+      if (!currentUser) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('matches')
+          .select('user1_id, user2_id')
+          .eq('is_active', true)
+          .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`);
+
+        if (error) {
+          console.error('Error fetching matches:', error);
+          return;
+        }
+
+        const matchedIds = new Set<string>();
+        (data || []).forEach((match) => {
+          if (match.user1_id === currentUser.id) {
+            matchedIds.add(match.user2_id);
+          } else {
+            matchedIds.add(match.user1_id);
+          }
+        });
+        setMatchedUserIds(matchedIds);
+      } catch (error) {
+        console.error('Error fetching matches:', error);
+      }
+    };
+
+    fetchMatches();
+  }, [currentUser]);
 
   // All hooks must be called before any conditional returns
   // Use conversations directly to ensure re-render when conversations change
   const allConversations = currentUser ? getConversationsForUser(currentUser.id) : [];
+  
+  // Filter conversations for matches tab (only conversations with matched users)
+  const matchedConversations = useMemo(() => {
+    if (!currentUser || matchedUserIds.size === 0) return [];
+    
+    return allConversations.filter(conv => {
+      // Only show 1-on-1 conversations (not groups)
+      if (conv.isGroup) return false;
+      
+      // Check if the other participant is a matched user
+      const otherUserId = conv.participants.find(id => id !== currentUser.id);
+      return otherUserId ? matchedUserIds.has(otherUserId) : false;
+    });
+  }, [allConversations, currentUser, matchedUserIds]);
   
   // Get all matched/contacted users for group creation
   const availableContacts = useMemo(() => {
@@ -33,15 +86,15 @@ export default function ChatScreen() {
     return Array.from(contactIds).map(id => getUserById(id)).filter(Boolean);
   }, [allConversations, currentUser.id, getUserById]);
 
-  // Filter conversations based on search
-  const filteredConversations = useMemo(() => {
+  // Filter conversations based on search (for Messages tab)
+  const filteredAllConversations = useMemo(() => {
     if (!searchQuery.trim()) return allConversations;
     
     const query = searchQuery.toLowerCase();
     return allConversations.filter(conv => {
       // Search in participant names
       const participantNames = conv.participants
-        .filter(id => id !== currentUser.id)
+        .filter(id => id !== currentUser?.id)
         .map(id => getUserById(id)?.name || '')
         .join(' ')
         .toLowerCase();
@@ -63,6 +116,37 @@ export default function ChatScreen() {
       return false;
     });
   }, [allConversations, searchQuery, currentUser, getUserById]);
+
+  // Filter matched conversations based on search (for Matches tab)
+  const filteredMatchedConversations = useMemo(() => {
+    if (!searchQuery.trim()) return matchedConversations;
+    
+    const query = searchQuery.toLowerCase();
+    return matchedConversations.filter(conv => {
+      // Search in participant names
+      const participantNames = conv.participants
+        .filter(id => id !== currentUser?.id)
+        .map(id => getUserById(id)?.name || '')
+        .join(' ')
+        .toLowerCase();
+      
+      if (participantNames.includes(query)) return true;
+      
+      // Search in message texts
+      if (conv.messages && conv.messages.length > 0) {
+        const messageTexts = conv.messages
+          .map(msg => msg.text || '')
+          .join(' ')
+          .toLowerCase();
+        if (messageTexts.includes(query)) return true;
+      }
+      
+      // Search in last message
+      if (conv.lastMessage?.text?.toLowerCase().includes(query)) return true;
+      
+      return false;
+    });
+  }, [matchedConversations, searchQuery, currentUser, getUserById]);
 
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -144,7 +228,8 @@ export default function ChatScreen() {
     setSelectedGroupMembers(new Set());
   };
 
-  const renderConversation = ({ item }: { item: any }) => {
+
+  const renderConversation = ({ item }: { item: typeof allConversations[0] }) => {
     if (!currentUser) return null;
     const otherUserIds = item.participants.filter((id: string) => id !== currentUser.id);
     const otherUsers = otherUserIds.map((id: string) => getUserById(id)).filter(Boolean);
@@ -235,6 +320,14 @@ export default function ChatScreen() {
     );
   };
 
+  if (!currentUser) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.noUserText}>Please sign up first</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -288,26 +381,110 @@ export default function ChatScreen() {
         )}
       </View>
 
-      {/* Conversations List */}
-      {filteredConversations.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={64} color="#E8D5C4" />
-          <Text style={styles.emptyText}>
-            {searchQuery ? 'No conversations found' : 'No conversations yet'}
-          </Text>
-          <Text style={styles.emptySubtext}>
-            {searchQuery ? 'Try a different search term' : 'Start chatting with other users!'}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredConversations}
-          renderItem={renderConversation}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
+      {/* Tab Navigator */}
+      <Tab.Navigator
+        tabBar={(props) => (
+          <View style={styles.customTabBar}>
+            {props.state.routes.map((route, index) => {
+              const { options } = props.descriptors[route.key];
+              const label = options.tabBarLabel !== undefined
+                ? options.tabBarLabel
+                : options.title !== undefined
+                ? options.title
+                : route.name;
+
+              const isFocused = props.state.index === index;
+
+              const onPress = () => {
+                const event = props.navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+
+                if (!isFocused && !event.defaultPrevented) {
+                  props.navigation.navigate(route.name);
+                }
+              };
+
+              return (
+                <TouchableOpacity
+                  key={route.key}
+                  accessibilityRole="button"
+                  accessibilityState={isFocused ? { selected: true } : {}}
+                  accessibilityLabel={options.tabBarAccessibilityLabel}
+                  testID={options.tabBarTestID}
+                  onPress={onPress}
+                  style={[
+                    styles.customTabButton,
+                    isFocused && styles.customTabButtonActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.customTabLabel,
+                      isFocused && styles.customTabLabelActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      >
+        <Tab.Screen name="Messages" options={{ tabBarLabel: 'Messages' }}>
+          {() => (
+            <View style={{ flex: 1 }}>
+              {filteredAllConversations.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="chatbubbles-outline" size={64} color="#E8D5C4" />
+                  <Text style={styles.emptyText}>
+                    {searchQuery ? 'No conversations found' : 'No conversations yet'}
+                  </Text>
+                  <Text style={styles.emptySubtext}>
+                    {searchQuery ? 'Try a different search term' : 'Start chatting with other users!'}
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredAllConversations}
+                  renderItem={renderConversation}
+                  keyExtractor={(item) => item.id}
+                  contentContainerStyle={styles.listContent}
+                  ItemSeparatorComponent={() => <View style={styles.separator} />}
+                />
+              )}
+            </View>
+          )}
+        </Tab.Screen>
+        <Tab.Screen name="Matches" options={{ tabBarLabel: 'Matches' }}>
+          {() => (
+            <View style={{ flex: 1 }}>
+              {filteredMatchedConversations.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="heart-outline" size={64} color="#E8D5C4" />
+                  <Text style={styles.emptyText}>
+                    {searchQuery ? 'No matches found' : 'No matches yet'}
+                  </Text>
+                  <Text style={styles.emptySubtext}>
+                    {searchQuery ? 'Try a different search term' : 'Swipe right on roommates to match and start chatting!'}
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredMatchedConversations}
+                  renderItem={renderConversation}
+                  keyExtractor={(item) => item.id}
+                  contentContainerStyle={styles.listContent}
+                  ItemSeparatorComponent={() => <View style={styles.separator} />}
+                />
+              )}
+            </View>
+          )}
+        </Tab.Screen>
+      </Tab.Navigator>
 
       {/* Group Chat Modal */}
       <Modal visible={showGroupModal} transparent animationType="slide" onRequestClose={() => setShowGroupModal(false)}>
@@ -687,6 +864,35 @@ const styles = StyleSheet.create({
   modalCreateText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  customTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF5E1',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8D5C4',
+  },
+  customTabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  customTabButtonActive: {
+    backgroundColor: '#FF6B35',
+  },
+  customTabLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#A68B7B',
+  },
+  customTabLabelActive: {
     color: '#FFFFFF',
   },
 });

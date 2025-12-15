@@ -21,25 +21,25 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   // Fetch properties ONCE on mount
   // Never refetch on re-render, never fetch inside render functions
   const fetchProperties = async () => {
-    console.log('🏠 [PropertyContext] Starting property fetch...');
+    console.log('[PropertyContext] Starting property fetch...');
     try {
       setLoading(true);
       setError(null);
-      console.log('🏠 [PropertyContext] Calling searchProperties...');
+      console.log('[PropertyContext] Calling searchProperties...');
       // Note: searchProperties makes 5 separate API calls (2 SF + 3 other cities)
       // The num_records parameter is overridden in individual calls (1 per call)
       const data = await searchProperties();
-      console.log('🏠 [PropertyContext] Properties fetched successfully:', data.length);
+      console.log('[PropertyContext] Properties fetched successfully:', data.length);
       setProperties(data);
       if (data.length === 0) {
-        console.warn('⚠️ [PropertyContext] No properties returned from API');
+        console.warn('Warning [PropertyContext] No properties returned from API');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch properties';
       setError(errorMessage);
-      console.error('❌ [PropertyContext] Error fetching properties:', err);
+      console.error('Error [PropertyContext] Error fetching properties:', err);
       if (err instanceof Error) {
-        console.error('❌ [PropertyContext] Error details:', {
+        console.error('Error [PropertyContext] Error details:', {
           message: err.message,
           stack: err.stack,
         });
@@ -48,7 +48,7 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
       setProperties([]);
     } finally {
       setLoading(false);
-      console.log('🏠 [PropertyContext] Property fetch complete');
+      console.log('[PropertyContext] Property fetch complete');
     }
   };
 

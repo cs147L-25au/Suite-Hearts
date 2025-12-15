@@ -7,7 +7,7 @@
 // Set to true to use local photos from assets folder instead of Picsum API
 const USE_LOCAL_PHOTOS = false;
 
-// Local photo assets (add your photos to assets/listing-photos/ folder)
+// Local photo assets 
 const LOCAL_PHOTOS = [
   require('../assets/listing-photos/photo1.jpg'),
   require('../assets/listing-photos/photo2.jpg'),
@@ -39,7 +39,7 @@ type PhotoSource = string | { uri: string } | number;
 function getLocalPhoto(listingId: string, index: number = 0): PhotoSource {
   if (LOCAL_PHOTOS.length === 0) {
     // Fallback to Picsum if no local photos available
-    // This shouldn't happen if USE_LOCAL_PHOTOS is true, but handle gracefully
+    // This shouldn't happen if USE_LOCAL_PHOTOS is true, but handle 
     const seed = listingId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const realEstateSeeds = [
       101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
@@ -122,14 +122,3 @@ export function getRandomRealEstatePhotos(listingId: string, count: number = 1):
   
   return photos;
 }
-
-/**
- * Instructions for using local photos:
- * 
- * 1. Create a folder: Suite_Hearts/assets/listing-photos/
- * 2. Add 20 real estate/interior photos named: photo1.jpg, photo2.jpg, ..., photo20.jpg
- * 3. Set USE_LOCAL_PHOTOS to true above
- * 4. The photos will be randomly assigned to listings (consistent per listing ID)
- * 
- * Note: You can use .png, .jpg, or .jpeg formats. Just update the require() paths above.
- */
