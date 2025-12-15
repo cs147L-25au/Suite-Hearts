@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { useUser } from '../context/UserContext';
 import { Property } from '../lib/datafiniti';
 import { Listing, HomeStackParamList } from '../types';
 import { supabase } from '../lib/supabase';
+import { getRandomRealEstatePhotos } from '../lib/photoUtils';
 
 type PropertyListNavigationProp = StackNavigationProp<HomeStackParamList>;
 
@@ -22,6 +23,7 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
   const [myListings, setMyListings] = useState<Listing[]>([]);
   const [allUserListings, setAllUserListings] = useState<Listing[]>([]);
   const [showLikedListings, setShowLikedListings] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch ALL user-created listings (not just current user's)
   useEffect(() => {
@@ -132,8 +134,29 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
   // Combine all listings: Supabase listings + external properties
   const allListings = [...myListings, ...allUserListings, ...externalListings];
   
+  // Filter listings by search query (address match)
+  const filteredListings = searchQuery.trim() 
+    ? allListings.filter(listing => 
+        listing.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        listing.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        listing.state.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : allListings;
+  
   // Get liked listings from all available listings
   const likedListingsData = allListings.filter(listing => isListingLiked(listing.id));
+  
+  // Helper function to get photo for a listing
+  const getListingPhoto = (listing: Listing | Property) => {
+    if ('photos' in listing && listing.photos && listing.photos.length > 0) {
+      const firstPhoto = listing.photos[0];
+      return typeof firstPhoto === 'string' ? { uri: firstPhoto } : firstPhoto;
+    }
+    // Get random photo for listings without photos
+    const photos = getRandomRealEstatePhotos(listing.id, 1);
+    const photo = photos[0];
+    return typeof photo === 'string' ? { uri: photo } : photo;
+  };
 
   // If showing liked listings, render that view
   if (showLikedListings) {
@@ -161,7 +184,9 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
               <Text style={styles.emptySubtext}>Swipe right on listings to save them here</Text>
             </View>
           ) : (
-            likedListingsData.map((listing) => (
+            likedListingsData.map((listing) => {
+              const photo = getListingPhoto(listing);
+              return (
               <TouchableOpacity
                 key={listing.id}
                 style={[
@@ -175,9 +200,15 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
                 activeOpacity={0.7}
               >
                 <View style={styles.imageContainer}>
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>Property Photo</Text>
-                  </View>
+                  {typeof photo === 'object' && 'uri' in photo ? (
+                    <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
+                  ) : typeof photo === 'number' ? (
+                    <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Ionicons name="home" size={32} color="#A68B7B" />
+                    </View>
+                  )}
                 </View>
                 <View style={styles.propertyInfo}>
                   <Text style={styles.price}>${listing.price.toLocaleString()}</Text>
@@ -204,7 +235,8 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
                   )}
                 </View>
               </TouchableOpacity>
-            ))
+              );
+            })
           )}
         </ScrollView>
       </View>
@@ -229,16 +261,48 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
           <View style={styles.placeholder} />
         )}
       </View>
+      
+      {/* Liked Listings Row - Full width below header */}
+      {likedListingsData.length > 0 && (
+        <TouchableOpacity 
+          onPress={() => setShowLikedListings(true)}
+          style={styles.likedListingsRow}
+        >
+          <Ionicons name="heart" size={20} color="#FF6B35" />
+          <Text style={styles.likedListingsRowText}>Liked Listings</Text>
+          <Ionicons name="chevron-forward" size={20} color="#FF6B35" />
+        </TouchableOpacity>
+      )}
+      
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by address, city, or state..."
+          placeholderTextColor="#8E8E93"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color="#A68B7B" />
+          </TouchableOpacity>
+        )}
+      </View>
+      
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* My Listings Section */}
-        {myListings.length > 0 && (
+        {myListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 && (
           <>
             <Text style={styles.sectionTitle}>My Listings</Text>
-            {myListings.map((listing) => (
+            {myListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).map((listing) => {
+              const photo = getListingPhoto(listing);
+              return (
               <TouchableOpacity
                 key={listing.id}
                 style={[
@@ -249,11 +313,17 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
                 onPress={() => handleListingPress(listing)}
                 activeOpacity={0.7}
               >
-                {/* Property Image Placeholder */}
+                {/* Property Image */}
                 <View style={styles.imageContainer}>
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>Property Photo</Text>
-                  </View>
+                  {typeof photo === 'object' && 'uri' in photo ? (
+                    <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
+                  ) : typeof photo === 'number' ? (
+                    <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Ionicons name="home" size={32} color="#A68B7B" />
+                    </View>
+                  )}
                 </View>
 
                 {/* Property Info - Inverted Colors */}
@@ -282,15 +352,18 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
                   )}
                 </View>
               </TouchableOpacity>
-            ))}
+              );
+            })}
           </>
         )}
 
         {/* All User-Created Listings Section */}
-        {allUserListings.length > 0 && (
+        {allUserListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 && (
           <>
-            {myListings.length > 0 && <Text style={styles.sectionTitle}>All Listings</Text>}
-            {allUserListings.map((listing) => (
+            {myListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 && <Text style={styles.sectionTitle}>All Listings</Text>}
+            {allUserListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).map((listing) => {
+              const photo = getListingPhoto(listing);
+              return (
               <TouchableOpacity
                 key={listing.id}
                 style={[
@@ -300,11 +373,17 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
                 onPress={() => handleListingPress(listing)}
                 activeOpacity={0.7}
               >
-                {/* Property Image Placeholder */}
+                {/* Property Image */}
                 <View style={styles.imageContainer}>
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>Property Photo</Text>
-                  </View>
+                  {typeof photo === 'object' && 'uri' in photo ? (
+                    <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
+                  ) : typeof photo === 'number' ? (
+                    <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <Ionicons name="home" size={32} color="#A68B7B" />
+                    </View>
+                  )}
                 </View>
 
                 {/* Property Info */}
@@ -333,15 +412,18 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
                   )}
                 </View>
               </TouchableOpacity>
-            ))}
+              );
+            })}
           </>
         )}
 
         {/* External Properties */}
-        {externalListings.length > 0 && (
+        {externalListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 && (
           <>
-            {(myListings.length > 0 || allUserListings.length > 0) && <Text style={styles.sectionTitle}>External Listings</Text>}
-            {externalListings.map((property) => (
+            {(myListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 || allUserListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0) && <Text style={styles.sectionTitle}>External Listings</Text>}
+            {externalListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).map((property) => {
+              const photo = getListingPhoto(property);
+              return (
           <TouchableOpacity
             key={property.id}
             style={[
@@ -351,11 +433,17 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
             onPress={() => handlePropertyPress(property)}
             activeOpacity={0.7}
           >
-            {/* Property Image Placeholder */}
+            {/* Property Image */}
             <View style={styles.imageContainer}>
-              <View style={styles.imagePlaceholder}>
-                <Text style={styles.imagePlaceholderText}>Property Photo</Text>
-              </View>
+              {typeof photo === 'object' && 'uri' in photo ? (
+                <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
+              ) : typeof photo === 'number' ? (
+                <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="home" size={32} color="#A68B7B" />
+                </View>
+              )}
             </View>
 
             {/* Property Info */}
@@ -384,7 +472,8 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
               )}
             </View>
           </TouchableOpacity>
-            ))}
+              );
+            })}
           </>
         )}
       </ScrollView>
@@ -485,6 +574,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FF6B35',
   },
+  likedListingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF6B35',
+  },
+  likedListingsRowText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF6B35',
+    marginLeft: 8,
+  },
   scrollView: {
     flex: 1,
   },
@@ -524,6 +633,31 @@ const styles = StyleSheet.create({
   imagePlaceholderText: {
     fontSize: 16,
     color: '#A68B7B',
+  },
+  propertyImage: {
+    width: '100%',
+    height: '100%',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8D5C4',
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#6F4E37',
+    padding: 0,
   },
   propertyInfo: {
     padding: 16,

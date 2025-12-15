@@ -7,11 +7,11 @@
  * These restrictions are enforced at the data layer level.
  * 
  * API Usage Limits:
- * - Fetches 5 listings total: 2 from San Francisco, 1 each from Berkeley, Palo Alto, San Jose
+ * - Fetches 30 listings total: 15 from San Francisco, 5 each from Berkeley, Palo Alto, San Jose
  * - Implements in-memory caching to prevent duplicate requests
- * - Makes exactly FIVE network requests per unique query (2 SF + 3 other cities)
+ * - Makes exactly 30 network requests per unique query (15 SF + 5 Berkeley + 5 Palo Alto + 5 San Jose)
  * - Filters out sale prices and non-rental properties based on statuses and price types
- * - Only accepts rental properties under $8,000/month
+ * - Only accepts rental properties between $400 and $7,000/month
  * 
  * ============================================================================
  * API KEY SETUP INSTRUCTIONS:
@@ -266,13 +266,13 @@ function transformProperty(record: DatafinitiRecord): Property | null {
       }
     } else {
       // If no explicit rental price found, check if any price is NOT a sale
-      // and use the first non-sale price that's under $8k
+      // and use the first non-sale price that's between $400 and $7k
       const nonSalePrice = record.prices.find(p => {
         const isSale = p.isSale === true || p.isSale === 'true';
         const isSold = p.isSold === true || p.isSold === 'true';
         const isSaleType = p.type === 'Sale List' || p.type === 'Sale Price';
         const amount = p.amountMax || p.amountMin || p.amount || 0;
-        return !isSale && !isSold && !isSaleType && amount > 0 && amount < 8000;
+        return !isSale && !isSold && !isSaleType && amount >= 400 && amount <= 7000;
       });
       
       if (nonSalePrice) {
@@ -287,15 +287,21 @@ function transformProperty(record: DatafinitiRecord): Property | null {
     }
   }
   
-  // Validate price is a reasonable monthly rent under $8k
+  // Validate price is a reasonable monthly rent between $400 and $7k
   if (price === 0) {
     console.warn(`⚠️ [Datafiniti] Record ${record.id} has no valid rental price`);
     return null;
   }
   
-  // Filter out anything over $8k per month (user requirement)
-  if (price > 8000) {
-    console.warn(`⚠️ [Datafiniti] Record ${record.id} has price $${price} which exceeds $8k/month limit`);
+  // Filter out anything under $400 per month (too low to be realistic)
+  if (price < 400) {
+    console.warn(`⚠️ [Datafiniti] Record ${record.id} has price $${price} which is below $400/month minimum`);
+    return null;
+  }
+  
+  // Filter out anything over $7k per month (user requirement)
+  if (price > 7000) {
+    console.warn(`⚠️ [Datafiniti] Record ${record.id} has price $${price} which exceeds $7k/month limit`);
     return null;
   }
   
@@ -305,9 +311,9 @@ function transformProperty(record: DatafinitiRecord): Property | null {
     return null;
   }
   
-  // Final check: if we have a valid rental price under $8k, accept it
+  // Final check: if we have a valid rental price between $400 and $7k, accept it
   // (even if status says "For Sale", as long as we have a rental price/estimate)
-  if (price > 0 && price <= 8000) {
+  if (price >= 400 && price <= 7000) {
     if (hasRentalEstimate || hasValidRentalStatus) {
       console.log(`✅ [Datafiniti] Record ${record.id} accepted with rental price $${price}/month (has rental status/estimate)`);
     } else {
@@ -489,59 +495,48 @@ export async function searchProperties(params: {
   
   console.log('✅ [Datafiniti] API key found and validated');
 
-  // Build queries: 10 separate API calls (4 for SF, 2 each for Berkeley, Palo Alto, San Jose)
+  // Build queries: 30 separate API calls (15 for SF, 5 each for Berkeley, Palo Alto, San Jose)
   // RENTAL-ONLY: We filter for rental properties in code (more reliable than query syntax)
   const userQuery = params.query || '';
   
-  // Query for San Francisco (4 calls, 1 record each)
+  // Query for San Francisco (15 calls, 1 record each)
   const sfQuery = userQuery
     ? `province:CA AND city:"San Francisco" AND (${userQuery})`
     : 'province:CA AND city:"San Francisco"';
   
-  // Query for Berkeley (2 calls, 1 record each)
+  // Query for Berkeley (5 calls, 1 record each)
   const berkeleyQuery = userQuery
     ? `province:CA AND city:"Berkeley" AND (${userQuery})`
     : 'province:CA AND city:"Berkeley"';
   
-  // Query for Palo Alto (2 calls, 1 record each)
+  // Query for Palo Alto (5 calls, 1 record each)
   const paloAltoQuery = userQuery
     ? `province:CA AND city:"Palo Alto" AND (${userQuery})`
     : 'province:CA AND city:"Palo Alto"';
   
-  // Query for San Jose (2 calls, 1 record each)
+  // Query for San Jose (5 calls, 1 record each)
   const sanJoseQuery = userQuery
     ? `province:CA AND city:"San Jose" AND (${userQuery})`
     : 'province:CA AND city:"San Jose"';
 
-  // Create cache keys for all 10 calls
-  const sfCacheKey1 = `sf1_${sfQuery}`;
-  const sfCacheKey2 = `sf2_${sfQuery}`;
-  const sfCacheKey3 = `sf3_${sfQuery}`;
-  const sfCacheKey4 = `sf4_${sfQuery}`;
-  const berkeleyCacheKey1 = `berkeley1_${berkeleyQuery}`;
-  const berkeleyCacheKey2 = `berkeley2_${berkeleyQuery}`;
-  const paloAltoCacheKey1 = `paloalto1_${paloAltoQuery}`;
-  const paloAltoCacheKey2 = `paloalto2_${paloAltoQuery}`;
-  const sanJoseCacheKey1 = `sanjose1_${sanJoseQuery}`;
-  const sanJoseCacheKey2 = `sanjose2_${sanJoseQuery}`;
+  // Create cache keys for all 30 calls
+  const sfCacheKeys = Array.from({ length: 15 }, (_, i) => `sf${i + 1}_${sfQuery}`);
+  const berkeleyCacheKeys = Array.from({ length: 5 }, (_, i) => `berkeley${i + 1}_${berkeleyQuery}`);
+  const paloAltoCacheKeys = Array.from({ length: 5 }, (_, i) => `paloalto${i + 1}_${paloAltoQuery}`);
+  const sanJoseCacheKeys = Array.from({ length: 5 }, (_, i) => `sanjose${i + 1}_${sanJoseQuery}`);
+  const allCacheKeys = [...sfCacheKeys, ...berkeleyCacheKeys, ...paloAltoCacheKeys, ...sanJoseCacheKeys];
 
   // Check cache first
-  if (cache.has(sfCacheKey1) && cache.has(sfCacheKey2) && cache.has(sfCacheKey3) && cache.has(sfCacheKey4) &&
-      cache.has(berkeleyCacheKey1) && cache.has(berkeleyCacheKey2) &&
-      cache.has(paloAltoCacheKey1) && cache.has(paloAltoCacheKey2) &&
-      cache.has(sanJoseCacheKey1) && cache.has(sanJoseCacheKey2)) {
+  if (allCacheKeys.every(key => cache.has(key))) {
     console.log('Using cached properties');
-    const sf1 = cache.get(sfCacheKey1)!;
-    const sf2 = cache.get(sfCacheKey2)!;
-    const sf3 = cache.get(sfCacheKey3)!;
-    const sf4 = cache.get(sfCacheKey4)!;
-    const berkeley1 = cache.get(berkeleyCacheKey1)!;
-    const berkeley2 = cache.get(berkeleyCacheKey2)!;
-    const paloAlto1 = cache.get(paloAltoCacheKey1)!;
-    const paloAlto2 = cache.get(paloAltoCacheKey2)!;
-    const sanJose1 = cache.get(sanJoseCacheKey1)!;
-    const sanJose2 = cache.get(sanJoseCacheKey2)!;
-    return [...sf1, ...sf2, ...sf3, ...sf4, ...berkeley1, ...berkeley2, ...paloAlto1, ...paloAlto2, ...sanJose1, ...sanJose2];
+    const cachedProperties: Property[] = [];
+    allCacheKeys.forEach(key => {
+      const props = cache.get(key);
+      if (props) {
+        cachedProperties.push(...props);
+      }
+    });
+    return cachedProperties;
   }
 
   // Fetch properties from both queries
@@ -698,149 +693,111 @@ export async function searchProperties(params: {
     console.log(`\n🚀 [Datafiniti] ==========================================`);
     console.log(`🚀 [Datafiniti] STARTING PROPERTY FETCH`);
     console.log(`🚀 [Datafiniti] ==========================================`);
-    console.log(`📍 [Datafiniti] SF Query: "${sfQuery}" (4 calls)`);
-    console.log(`📍 [Datafiniti] Berkeley Query: "${berkeleyQuery}" (2 calls)`);
-    console.log(`📍 [Datafiniti] Palo Alto Query: "${paloAltoQuery}" (2 calls)`);
-    console.log(`📍 [Datafiniti] San Jose Query: "${sanJoseQuery}" (2 calls)`);
+    console.log(`📍 [Datafiniti] SF Query: "${sfQuery}" (15 calls)`);
+    console.log(`📍 [Datafiniti] Berkeley Query: "${berkeleyQuery}" (5 calls)`);
+    console.log(`📍 [Datafiniti] Palo Alto Query: "${paloAltoQuery}" (5 calls)`);
+    console.log(`📍 [Datafiniti] San Jose Query: "${sanJoseQuery}" (5 calls)`);
     console.log(`🔑 [Datafiniti] USE_MOCK_DATA: ${USE_MOCK_DATA}`);
     console.log(`🔑 [Datafiniti] API Key present: ${!!apiKey}`);
     
-    // Fetch 10 separate API calls: 4 for SF, 2 each for Berkeley, Palo Alto, San Jose
+    // Fetch 30 separate API calls: 15 for SF, 5 each for Berkeley, Palo Alto, San Jose
     // Use Promise.allSettled to handle individual failures gracefully
-    const [sf1Result, sf2Result, sf3Result, sf4Result, berkeley1Result, berkeley2Result, paloAlto1Result, paloAlto2Result, sanJose1Result, sanJose2Result] = await Promise.allSettled([
-      fetchPropertiesForQuery(sfQuery, 1, 'San Francisco (Call 1)'),
-      fetchPropertiesForQuery(sfQuery, 1, 'San Francisco (Call 2)'),
-      fetchPropertiesForQuery(sfQuery, 1, 'San Francisco (Call 3)'),
-      fetchPropertiesForQuery(sfQuery, 1, 'San Francisco (Call 4)'),
-      fetchPropertiesForQuery(berkeleyQuery, 1, 'Berkeley (Call 1)'),
-      fetchPropertiesForQuery(berkeleyQuery, 1, 'Berkeley (Call 2)'),
-      fetchPropertiesForQuery(paloAltoQuery, 1, 'Palo Alto (Call 1)'),
-      fetchPropertiesForQuery(paloAltoQuery, 1, 'Palo Alto (Call 2)'),
-      fetchPropertiesForQuery(sanJoseQuery, 1, 'San Jose (Call 1)'),
-      fetchPropertiesForQuery(sanJoseQuery, 1, 'San Jose (Call 2)'),
-    ]);
+    const sfPromises = Array.from({ length: 15 }, (_, i) => 
+      fetchPropertiesForQuery(sfQuery, 1, `San Francisco (Call ${i + 1})`)
+    );
+    const berkeleyPromises = Array.from({ length: 5 }, (_, i) => 
+      fetchPropertiesForQuery(berkeleyQuery, 1, `Berkeley (Call ${i + 1})`)
+    );
+    const paloAltoPromises = Array.from({ length: 5 }, (_, i) => 
+      fetchPropertiesForQuery(paloAltoQuery, 1, `Palo Alto (Call ${i + 1})`)
+    );
+    const sanJosePromises = Array.from({ length: 5 }, (_, i) => 
+      fetchPropertiesForQuery(sanJoseQuery, 1, `San Jose (Call ${i + 1})`)
+    );
+    
+    const allPromises = [...sfPromises, ...berkeleyPromises, ...paloAltoPromises, ...sanJosePromises];
+    const allResults = await Promise.allSettled(allPromises);
 
     // Process results
-    let sf1Properties: Property[] = [];
-    let sf2Properties: Property[] = [];
-    let sf3Properties: Property[] = [];
-    let sf4Properties: Property[] = [];
-    let berkeley1Properties: Property[] = [];
-    let berkeley2Properties: Property[] = [];
-    let paloAlto1Properties: Property[] = [];
-    let paloAlto2Properties: Property[] = [];
-    let sanJose1Properties: Property[] = [];
-    let sanJose2Properties: Property[] = [];
+    const sfProperties: Property[][] = [];
+    const berkeleyProperties: Property[][] = [];
+    const paloAltoProperties: Property[][] = [];
+    const sanJoseProperties: Property[][] = [];
     
-    if (sf1Result.status === 'fulfilled') {
-      sf1Properties = sf1Result.value;
-      console.log(`✅ [Datafiniti] SF Call 1 succeeded: ${sf1Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] SF Call 1 failed:`, sf1Result.reason);
+    // Process SF results (first 15)
+    for (let i = 0; i < 15; i++) {
+      const result = allResults[i];
+      if (result.status === 'fulfilled') {
+        sfProperties.push(result.value);
+        console.log(`✅ [Datafiniti] SF Call ${i + 1} succeeded: ${result.value.length} properties`);
+      } else {
+        sfProperties.push([]);
+        console.error(`❌ [Datafiniti] SF Call ${i + 1} failed:`, result.reason);
+      }
     }
     
-    if (sf2Result.status === 'fulfilled') {
-      sf2Properties = sf2Result.value;
-      console.log(`✅ [Datafiniti] SF Call 2 succeeded: ${sf2Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] SF Call 2 failed:`, sf2Result.reason);
+    // Process Berkeley results (next 5)
+    for (let i = 0; i < 5; i++) {
+      const result = allResults[15 + i];
+      if (result.status === 'fulfilled') {
+        berkeleyProperties.push(result.value);
+        console.log(`✅ [Datafiniti] Berkeley Call ${i + 1} succeeded: ${result.value.length} properties`);
+      } else {
+        berkeleyProperties.push([]);
+        console.error(`❌ [Datafiniti] Berkeley Call ${i + 1} failed:`, result.reason);
+      }
     }
     
-    if (sf3Result.status === 'fulfilled') {
-      sf3Properties = sf3Result.value;
-      console.log(`✅ [Datafiniti] SF Call 3 succeeded: ${sf3Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] SF Call 3 failed:`, sf3Result.reason);
+    // Process Palo Alto results (next 5)
+    for (let i = 0; i < 5; i++) {
+      const result = allResults[20 + i];
+      if (result.status === 'fulfilled') {
+        paloAltoProperties.push(result.value);
+        console.log(`✅ [Datafiniti] Palo Alto Call ${i + 1} succeeded: ${result.value.length} properties`);
+      } else {
+        paloAltoProperties.push([]);
+        console.error(`❌ [Datafiniti] Palo Alto Call ${i + 1} failed:`, result.reason);
+      }
     }
     
-    if (sf4Result.status === 'fulfilled') {
-      sf4Properties = sf4Result.value;
-      console.log(`✅ [Datafiniti] SF Call 4 succeeded: ${sf4Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] SF Call 4 failed:`, sf4Result.reason);
-    }
-    
-    if (berkeley1Result.status === 'fulfilled') {
-      berkeley1Properties = berkeley1Result.value;
-      console.log(`✅ [Datafiniti] Berkeley Call 1 succeeded: ${berkeley1Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] Berkeley Call 1 failed:`, berkeley1Result.reason);
-    }
-    
-    if (berkeley2Result.status === 'fulfilled') {
-      berkeley2Properties = berkeley2Result.value;
-      console.log(`✅ [Datafiniti] Berkeley Call 2 succeeded: ${berkeley2Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] Berkeley Call 2 failed:`, berkeley2Result.reason);
-    }
-    
-    if (paloAlto1Result.status === 'fulfilled') {
-      paloAlto1Properties = paloAlto1Result.value;
-      console.log(`✅ [Datafiniti] Palo Alto Call 1 succeeded: ${paloAlto1Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] Palo Alto Call 1 failed:`, paloAlto1Result.reason);
-    }
-    
-    if (paloAlto2Result.status === 'fulfilled') {
-      paloAlto2Properties = paloAlto2Result.value;
-      console.log(`✅ [Datafiniti] Palo Alto Call 2 succeeded: ${paloAlto2Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] Palo Alto Call 2 failed:`, paloAlto2Result.reason);
-    }
-    
-    if (sanJose1Result.status === 'fulfilled') {
-      sanJose1Properties = sanJose1Result.value;
-      console.log(`✅ [Datafiniti] San Jose Call 1 succeeded: ${sanJose1Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] San Jose Call 1 failed:`, sanJose1Result.reason);
-    }
-    
-    if (sanJose2Result.status === 'fulfilled') {
-      sanJose2Properties = sanJose2Result.value;
-      console.log(`✅ [Datafiniti] San Jose Call 2 succeeded: ${sanJose2Properties.length} properties`);
-    } else {
-      console.error(`❌ [Datafiniti] San Jose Call 2 failed:`, sanJose2Result.reason);
+    // Process San Jose results (last 5)
+    for (let i = 0; i < 5; i++) {
+      const result = allResults[25 + i];
+      if (result.status === 'fulfilled') {
+        sanJoseProperties.push(result.value);
+        console.log(`✅ [Datafiniti] San Jose Call ${i + 1} succeeded: ${result.value.length} properties`);
+      } else {
+        sanJoseProperties.push([]);
+        console.error(`❌ [Datafiniti] San Jose Call ${i + 1} failed:`, result.reason);
+      }
     }
 
     // Cache results only if successful
-    if (sf1Result.status === 'fulfilled') {
-      cache.set(sfCacheKey1, sf1Properties);
-    }
-    if (sf2Result.status === 'fulfilled') {
-      cache.set(sfCacheKey2, sf2Properties);
-    }
-    if (sf3Result.status === 'fulfilled') {
-      cache.set(sfCacheKey3, sf3Properties);
-    }
-    if (sf4Result.status === 'fulfilled') {
-      cache.set(sfCacheKey4, sf4Properties);
-    }
-    if (berkeley1Result.status === 'fulfilled') {
-      cache.set(berkeleyCacheKey1, berkeley1Properties);
-    }
-    if (berkeley2Result.status === 'fulfilled') {
-      cache.set(berkeleyCacheKey2, berkeley2Properties);
-    }
-    if (paloAlto1Result.status === 'fulfilled') {
-      cache.set(paloAltoCacheKey1, paloAlto1Properties);
-    }
-    if (paloAlto2Result.status === 'fulfilled') {
-      cache.set(paloAltoCacheKey2, paloAlto2Properties);
-    }
-    if (sanJose1Result.status === 'fulfilled') {
-      cache.set(sanJoseCacheKey1, sanJose1Properties);
-    }
-    if (sanJose2Result.status === 'fulfilled') {
-      cache.set(sanJoseCacheKey2, sanJose2Properties);
-    }
+    sfProperties.forEach((props, i) => {
+      if (props.length > 0) {
+        cache.set(sfCacheKeys[i], props);
+      }
+    });
+    berkeleyProperties.forEach((props, i) => {
+      if (props.length > 0) {
+        cache.set(berkeleyCacheKeys[i], props);
+      }
+    });
+    paloAltoProperties.forEach((props, i) => {
+      if (props.length > 0) {
+        cache.set(paloAltoCacheKeys[i], props);
+      }
+    });
+    sanJoseProperties.forEach((props, i) => {
+      if (props.length > 0) {
+        cache.set(sanJoseCacheKeys[i], props);
+      }
+    });
 
     // Combine results: SF first, then other cities
     // Deduplicate by ID (same property might be returned from multiple calls)
     const allPropertiesMap = new Map<string, Property>();
-    [...sf1Properties, ...sf2Properties, ...sf3Properties, ...sf4Properties, 
-     ...berkeley1Properties, ...berkeley2Properties, 
-     ...paloAlto1Properties, ...paloAlto2Properties, 
-     ...sanJose1Properties, ...sanJose2Properties].forEach(prop => {
+    [...sfProperties.flat(), ...berkeleyProperties.flat(), ...paloAltoProperties.flat(), ...sanJoseProperties.flat()].forEach(prop => {
       if (!allPropertiesMap.has(prop.id)) {
         allPropertiesMap.set(prop.id, prop);
       } else {
@@ -852,16 +809,18 @@ export async function searchProperties(params: {
     console.log(`\n📊 [Datafiniti] ==========================================`);
     console.log(`📊 [Datafiniti] FETCH SUMMARY`);
     console.log(`📊 [Datafiniti] ==========================================`);
-    console.log(`   SF Call 1: ${sf1Properties.length} properties`);
-    console.log(`   SF Call 2: ${sf2Properties.length} properties`);
-    console.log(`   SF Call 3: ${sf3Properties.length} properties`);
-    console.log(`   SF Call 4: ${sf4Properties.length} properties`);
-    console.log(`   Berkeley Call 1: ${berkeley1Properties.length} properties`);
-    console.log(`   Berkeley Call 2: ${berkeley2Properties.length} properties`);
-    console.log(`   Palo Alto Call 1: ${paloAlto1Properties.length} properties`);
-    console.log(`   Palo Alto Call 2: ${paloAlto2Properties.length} properties`);
-    console.log(`   San Jose Call 1: ${sanJose1Properties.length} properties`);
-    console.log(`   San Jose Call 2: ${sanJose2Properties.length} properties`);
+    sfProperties.forEach((props, i) => {
+      console.log(`   SF Call ${i + 1}: ${props.length} properties`);
+    });
+    berkeleyProperties.forEach((props, i) => {
+      console.log(`   Berkeley Call ${i + 1}: ${props.length} properties`);
+    });
+    paloAltoProperties.forEach((props, i) => {
+      console.log(`   Palo Alto Call ${i + 1}: ${props.length} properties`);
+    });
+    sanJoseProperties.forEach((props, i) => {
+      console.log(`   San Jose Call ${i + 1}: ${props.length} properties`);
+    });
     console.log(`   Total Properties: ${allProperties.length}`);
     
     if (allProperties.length > 0) {
@@ -873,23 +832,22 @@ export async function searchProperties(params: {
       console.warn(`   Possible reasons:`);
       console.warn(`   1. API key is invalid or expired`);
       console.warn(`   2. Query syntax is incorrect`);
-      console.warn(`   3. No rental properties match the filters (under $8k/month)`);
+      console.warn(`   3. No rental properties match the filters ($400-$7k/month)`);
       console.warn(`   4. API rate limit exceeded`);
       console.warn(`   5. Datafiniti API is down`);
     }
     
-    const failedFetches = [
-      sf1Result.status === 'rejected' ? 'SF Call 1' : null,
-      sf2Result.status === 'rejected' ? 'SF Call 2' : null,
-      sf3Result.status === 'rejected' ? 'SF Call 3' : null,
-      sf4Result.status === 'rejected' ? 'SF Call 4' : null,
-      berkeley1Result.status === 'rejected' ? 'Berkeley Call 1' : null,
-      berkeley2Result.status === 'rejected' ? 'Berkeley Call 2' : null,
-      paloAlto1Result.status === 'rejected' ? 'Palo Alto Call 1' : null,
-      paloAlto2Result.status === 'rejected' ? 'Palo Alto Call 2' : null,
-      sanJose1Result.status === 'rejected' ? 'San Jose Call 1' : null,
-      sanJose2Result.status === 'rejected' ? 'San Jose Call 2' : null,
-    ].filter(Boolean);
+    const failedFetches = allResults
+      .map((result, index) => {
+        if (result.status === 'rejected') {
+          if (index < 15) return `SF Call ${index + 1}`;
+          if (index < 20) return `Berkeley Call ${index - 14}`;
+          if (index < 25) return `Palo Alto Call ${index - 19}`;
+          return `San Jose Call ${index - 24}`;
+        }
+        return null;
+      })
+      .filter(Boolean);
     
     if (failedFetches.length > 0) {
       console.warn(`   ⚠️ Some fetches failed: ${failedFetches.join(', ')} - check errors above`);

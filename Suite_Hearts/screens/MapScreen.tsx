@@ -9,6 +9,7 @@ import { useProperties } from '../context/PropertyContext';
 import { Listing, HomeStackParamList } from '../types';
 import { Property } from '../lib/datafiniti';
 import { supabase } from '../lib/supabase';
+import { getRandomRealEstatePhotos } from '../lib/photoUtils';
 
 type MapScreenNavigationProp = StackNavigationProp<HomeStackParamList>;
 
@@ -111,11 +112,12 @@ export default function MapScreen() {
     setCurrentPhotoIndex(0);
   };
 
-  const getPhotos = (property: MapProperty): string[] => {
+  const getPhotos = (property: MapProperty): (string | number | { uri: string })[] => {
     if (property.source === 'user' && property.photos && property.photos.length > 0) {
       return property.photos;
     }
-    return []; // External properties get one photo assigned in ListingCard
+    // For external properties, get random photos
+    return getRandomRealEstatePhotos(property.id, 1);
   };
 
   const handleViewFullListing = () => {
@@ -210,10 +212,17 @@ export default function MapScreen() {
                     {(() => {
                       const photos = getPhotos(selectedProperty);
                       if (photos.length > 0) {
+                        const currentPhoto = photos[currentPhotoIndex];
                         return (
                           <>
                             <Image
-                              source={{ uri: photos[currentPhotoIndex] }}
+                              source={
+                                typeof currentPhoto === 'string' 
+                                  ? { uri: currentPhoto }
+                                  : typeof currentPhoto === 'number'
+                                  ? currentPhoto
+                                  : currentPhoto
+                              }
                               style={styles.photo}
                               resizeMode="cover"
                             />

@@ -59,7 +59,12 @@ export default function ProfileScreen() {
     }
     if (field === 'friendliness' || field === 'cleanliness') {
       const value = (currentUser as any)[field];
-      return value ? `${value}/10` : '';
+      // Return the raw number for the modal, not the formatted string
+      return value !== null && value !== undefined ? value : 5;
+    }
+    if (field === 'yearsExperience') {
+      // Return the raw number for the modal (it will be formatted in display)
+      return (currentUser as any)[field] || '';
     }
     return (currentUser as any)[field] || '';
   };
@@ -564,7 +569,7 @@ export default function ProfileScreen() {
             {renderFieldCard('Occupation', 'jobRole', currentUser.jobRole || '', 'briefcase-outline', false)}
             {renderFieldCard('Workplace', 'jobPlace', currentUser.jobPlace || '', 'business-outline', false)}
             {currentUser.userType === 'searcher' && renderFieldCard('University', 'university', currentUser.university, 'school-outline', true)}
-            {currentUser.userType === 'homeowner' && renderFieldCard('Experience', 'yearsExperience', currentUser.yearsExperience, 'trophy-outline', true)}
+            {currentUser.userType === 'homeowner' && renderFieldCard('Host Experience', 'yearsExperience', currentUser.yearsExperience ? `${currentUser.yearsExperience} years` : '', 'trophy-outline', true)}
             {renderFieldCard('Hometown', 'hometown', currentUser.hometown, 'home-outline', true)}
             {renderFieldCard('Location', 'location', currentUser.location, 'location-outline', true)}
           </View>

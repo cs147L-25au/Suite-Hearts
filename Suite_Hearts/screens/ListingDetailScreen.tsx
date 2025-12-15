@@ -7,6 +7,7 @@ import { HomeStackParamList, RootStackParamList, Listing } from '../types';
 import { Property } from '../lib/datafiniti';
 import { useUser } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
+import { getRandomRealEstatePhotos } from '../lib/photoUtils';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -53,6 +54,13 @@ export default function ListingDetailScreen() {
         .single();
 
       if (data && !error) {
+        // Fetch photos for this listing
+        const { data: photosData } = await supabase
+          .from('listing_photos')
+          .select('photo_url')
+          .eq('listing_id', id)
+          .order('photo_order', { ascending: true });
+
         const listing: Listing = {
           id: data.id,
           ownerId: data.owner_id,
@@ -65,7 +73,7 @@ export default function ListingDetailScreen() {
           price: data.price || 0,
           latitude: data.latitude,
           longitude: data.longitude,
-          photos: [], // Will fetch separately
+          photos: (photosData || []).map((p: any) => p.photo_url),
           bedrooms: data.bedrooms,
           bathrooms: data.bathrooms,
           squareFeet: data.square_feet,
@@ -103,12 +111,16 @@ export default function ListingDetailScreen() {
     }
   };
 
-  const getPhotos = (): string[] => {
+  const getPhotos = (): (string | number | { uri: string })[] => {
     if (!listingData) return [];
     if (listingData.source === 'user' && listingData.photos && listingData.photos.length > 0) {
       return listingData.photos;
     }
-    return []; // Datafiniti properties don't have photos yet
+    // For external listings, get random photos
+    if (listingData.source === 'external') {
+      return getRandomRealEstatePhotos(listingData.id, 1);
+    }
+    return [];
   };
 
   const handlePreviousPhoto = () => {

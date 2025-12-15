@@ -736,7 +736,7 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
       <Modal
         visible={showMessageModal}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowMessageModal(false)}
       >
         <View style={styles.messageModalContainer}>
@@ -745,56 +745,56 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
             activeOpacity={1}
             onPress={() => setShowMessageModal(false)}
           />
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.messageModalContent}
-            >
-              {/* Close Button */}
-              <TouchableOpacity 
-                style={styles.messageModalCloseButton}
-                onPress={() => setShowMessageModal(false)}
-              >
-                <Ionicons name="close" size={24} color="#6F4E37" />
-              </TouchableOpacity>
-
-              {/* Profile Picture and Name on Left */}
-              <View style={styles.messageModalLeftSection}>
-                <View style={styles.messageModalAvatarContainer}>
-                  {currentRoommate.profilePicture ? (
-                    <Image
-                      source={{ uri: currentRoommate.profilePicture }}
-                      style={styles.messageModalAvatarCircle}
-                    />
-                  ) : (
-                    <View style={styles.messageModalAvatarCirclePlaceholder}>
-                      <Ionicons name="person" size={32} color="#E8D5C4" />
-                    </View>
-                  )}
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.messageModalKeyboardView}
+          >
+            <View style={styles.messageModalContent}>
+              {/* Header with Close Button */}
+              <View style={styles.messageModalHeader}>
+                <View style={styles.messageModalHeaderLeft}>
+                  <View style={styles.messageModalAvatarContainer}>
+                    {currentRoommate.profilePicture ? (
+                      <Image
+                        source={{ uri: currentRoommate.profilePicture }}
+                        style={styles.messageModalAvatarCircle}
+                      />
+                    ) : (
+                      <View style={styles.messageModalAvatarCirclePlaceholder}>
+                        <Ionicons name="person" size={24} color="#E8D5C4" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.messageModalUserName} numberOfLines={1}>
+                    {currentRoommate.name}
+                  </Text>
                 </View>
-                <Text style={styles.messageModalUserNameBelow} numberOfLines={1}>
-                  {currentRoommate.name}
-                </Text>
+                <TouchableOpacity 
+                  style={styles.messageModalCloseButton}
+                  onPress={() => setShowMessageModal(false)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={24} color="#6F4E37" />
+                </TouchableOpacity>
               </View>
 
-              {/* Message Input on Right */}
-              <View style={styles.messageModalRightSection}>
-                <TextInput
-                  style={styles.messageModalInputBox}
-                  placeholder="type your message"
-                  placeholderTextColor="#A68B7B"
-                  value={messageText}
-                  onChangeText={setMessageText}
-                  multiline
-                  maxLength={500}
-                  autoFocus
-                />
-              </View>
+              {/* Message Input */}
+              <TextInput
+                style={styles.messageModalInputBox}
+                placeholder="Type your message..."
+                placeholderTextColor="#A68B7B"
+                value={messageText}
+                onChangeText={setMessageText}
+                multiline
+                maxLength={500}
+                autoFocus
+              />
 
-              {/* Send Button on Bottom */}
+              {/* Send Button */}
               <TouchableOpacity
                 style={[
-                  styles.messageModalSendButtonBottom,
-                  (!messageText.trim() || isSendingMessage) && styles.messageModalSendButtonBottomDisabled
+                  styles.messageModalSendButton,
+                  (!messageText.trim() || isSendingMessage) && styles.messageModalSendButtonDisabled
                 ]}
                 onPress={handleSendMessage}
                 disabled={!messageText.trim() || isSendingMessage}
@@ -805,7 +805,8 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
                   <Text style={styles.messageModalSendButtonText}>Send</Text>
                 )}
               </TouchableOpacity>
-            </KeyboardAvoidingView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
@@ -1282,7 +1283,7 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
         <Modal
           visible={showMessageModal}
           transparent={true}
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setShowMessageModal(false)}
         >
           <View style={styles.messageModalContainer}>
@@ -1293,46 +1294,47 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
             />
             <KeyboardAvoidingView 
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.messageModalContent}
+              style={styles.messageModalKeyboardView}
             >
-              {/* Close Button */}
-              <TouchableOpacity 
-                style={styles.messageModalCloseButton}
-                onPress={() => setShowMessageModal(false)}
-              >
-                <Ionicons name="close" size={24} color="#6F4E37" />
-              </TouchableOpacity>
-
-              {/* Profile Picture and Name on Left */}
-              <View style={styles.messageModalLeftSection}>
-                <View style={styles.messageModalAvatarContainer}>
-                  {(() => {
-                    const owner = users.find(u => u.id === currentListing.ownerId) || getUserById(currentListing.ownerId);
-                    return owner?.profilePicture ? (
-                      <Image
-                        source={{ uri: owner.profilePicture }}
-                        style={styles.messageModalAvatarCircle}
-                      />
-                    ) : (
-                      <View style={styles.messageModalAvatarCirclePlaceholder}>
-                        <Ionicons name="person" size={32} color="#E8D5C4" />
-                      </View>
-                    );
-                  })()}
+              <View style={styles.messageModalContent}>
+                {/* Header with Close Button */}
+                <View style={styles.messageModalHeader}>
+                  <View style={styles.messageModalHeaderLeft}>
+                    <View style={styles.messageModalAvatarContainer}>
+                      {(() => {
+                        const owner = users.find(u => u.id === currentListing.ownerId) || getUserById(currentListing.ownerId);
+                        return owner?.profilePicture ? (
+                          <Image
+                            source={{ uri: owner.profilePicture }}
+                            style={styles.messageModalAvatarCircle}
+                          />
+                        ) : (
+                          <View style={styles.messageModalAvatarCirclePlaceholder}>
+                            <Ionicons name="person" size={24} color="#E8D5C4" />
+                          </View>
+                        );
+                      })()}
+                    </View>
+                    <Text style={styles.messageModalUserName} numberOfLines={1}>
+                      {(() => {
+                        const owner = users.find(u => u.id === currentListing.ownerId) || getUserById(currentListing.ownerId);
+                        return owner?.name || 'Listing Owner';
+                      })()}
+                    </Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.messageModalCloseButton}
+                    onPress={() => setShowMessageModal(false)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close" size={24} color="#6F4E37" />
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.messageModalUserNameBelow} numberOfLines={1}>
-                  {(() => {
-                    const owner = users.find(u => u.id === currentListing.ownerId) || getUserById(currentListing.ownerId);
-                    return owner?.name || 'Listing Owner';
-                  })()}
-                </Text>
-              </View>
 
-              {/* Message Input on Right */}
-              <View style={styles.messageModalRightSection}>
+                {/* Message Input */}
                 <TextInput
                   style={styles.messageModalInputBox}
-                  placeholder="type your message"
+                  placeholder="Type your message..."
                   placeholderTextColor="#A68B7B"
                   value={messageText}
                   onChangeText={setMessageText}
@@ -1340,23 +1342,23 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                   maxLength={500}
                   autoFocus
                 />
-              </View>
 
-              {/* Send Button on Bottom */}
-              <TouchableOpacity
-                style={[
-                  styles.messageModalSendButtonBottom,
-                  (!messageText.trim() || isSendingMessage) && styles.messageModalSendButtonBottomDisabled
-                ]}
-                onPress={handleSendMessage}
-                disabled={!messageText.trim() || isSendingMessage}
-              >
-                {isSendingMessage ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.messageModalSendButtonText}>Send</Text>
-                )}
-              </TouchableOpacity>
+                {/* Send Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.messageModalSendButton,
+                    (!messageText.trim() || isSendingMessage) && styles.messageModalSendButtonDisabled
+                  ]}
+                  onPress={handleSendMessage}
+                  disabled={!messageText.trim() || isSendingMessage}
+                >
+                  {isSendingMessage ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.messageModalSendButtonText}>Send</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </KeyboardAvoidingView>
           </View>
         </Modal>
@@ -1704,10 +1706,6 @@ const styles = StyleSheet.create({
   expandedDescriptionSection: {
     marginBottom: 24,
   },
-  expandedDescriptionLabel: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
   expandedContactSection: {
     marginTop: 24,
     marginBottom: 24,
@@ -1764,8 +1762,9 @@ const styles = StyleSheet.create({
   },
   messageModalContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
   },
   messageModalBackdrop: {
     position: 'absolute',
@@ -1773,64 +1772,69 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 999,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    zIndex: 9998,
+  },
+  messageModalKeyboardView: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    zIndex: 10000,
   },
   messageModalContent: {
+    width: '90%',
+    maxWidth: 400,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    maxHeight: '35%',
-    minHeight: 250,
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 9999,
+    zIndex: 10001,
+  },
+  messageModalHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    zIndex: 1001,
-  },
-  messageModalCloseButton: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    zIndex: 10,
-    padding: 5,
-  },
-  messageModalLeftSection: {
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginRight: 16,
-    width: 80,
+    marginBottom: 20,
+  },
+  messageModalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
   },
   messageModalAvatarContainer: {
-    marginBottom: 8,
+    marginRight: 12,
   },
   messageModalAvatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     borderWidth: 2,
     borderColor: '#E8D5C4',
   },
   messageModalAvatarCirclePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#E8D5C4',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#E8D5C4',
   },
-  messageModalUserNameBelow: {
-    fontSize: 12,
-    fontWeight: '600',
+  messageModalUserName: {
+    fontSize: 18,
+    fontWeight: '700',
     color: '#6F4E37',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  messageModalRightSection: {
     flex: 1,
-    marginTop: 40,
+  },
+  messageModalCloseButton: {
+    padding: 5,
   },
   messageModalInputBox: {
     backgroundColor: '#F5F5F5',
@@ -1838,23 +1842,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     minHeight: 100,
-    maxHeight: 120,
+    maxHeight: 150,
     fontSize: 16,
     color: '#6F4E37',
     textAlignVertical: 'top',
+    marginBottom: 16,
   },
-  messageModalSendButtonBottom: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+  messageModalSendButton: {
     backgroundColor: '#FF6B35',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  messageModalSendButtonBottomDisabled: {
+  messageModalSendButtonDisabled: {
     backgroundColor: '#E8D5C4',
   },
   messageModalSendButtonText: {

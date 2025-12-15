@@ -122,6 +122,9 @@ export default function ProfileEditModal({ visible, field, value, user, onClose,
       } else if (field === 'friendliness') {
         const friendlinessValue = typeof value === 'string' ? parseInt(value) : (value || 5);
         setSelectedFriendliness(isNaN(friendlinessValue) ? 5 : Math.max(1, Math.min(10, friendlinessValue)));
+      } else if (field === 'friendliness') {
+        const friendlinessValue = typeof value === 'string' ? parseInt(value) : (value || 5);
+        setSelectedFriendliness(isNaN(friendlinessValue) ? 5 : Math.max(1, Math.min(10, friendlinessValue)));
       } else if (field === 'cleanliness') {
         const cleanlinessValue = typeof value === 'string' ? parseInt(value) : (value || 5);
         setSelectedCleanliness(isNaN(cleanlinessValue) ? 5 : Math.max(1, Math.min(10, cleanlinessValue)));
@@ -283,7 +286,7 @@ export default function ProfileEditModal({ visible, field, value, user, onClose,
         type: 'dropdown',
         options: ['Stanford', 'Berkeley', 'USF', 'SJSU'],
       },
-      yearsExperience: { label: 'Years of Experience', type: 'number', placeholder: 'Enter years' },
+      yearsExperience: { label: 'Host Experience', type: 'number', placeholder: 'Enter years' },
       hometown: { label: 'Hometown', type: 'text', placeholder: 'City, Country' },
       location: { label: 'Location', type: 'location', placeholder: 'Use your current location' },
       smoking: {
@@ -1083,7 +1086,11 @@ export default function ProfileEditModal({ visible, field, value, user, onClose,
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{config.label}</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity 
+              onPress={onClose}
+              style={styles.closeButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Ionicons name="close" size={24} color="#6F4E37" />
             </TouchableOpacity>
           </View>
@@ -1140,6 +1147,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: '#6F4E37',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   modalBody: {
     flex: 1,

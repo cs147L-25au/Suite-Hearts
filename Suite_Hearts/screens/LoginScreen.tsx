@@ -205,7 +205,7 @@ export default function LoginScreen({ navigation }: Props) {
         {/* Logo/Title Section */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Ionicons name="heart" size={48} color="#FF6B35" />
+            <Ionicons name="home" size={48} color="#FF6B35" />
           </View>
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to continue</Text>
