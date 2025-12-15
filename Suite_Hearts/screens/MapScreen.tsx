@@ -1,14 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Modal, Image, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Modal, Image, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../context/UserContext';
-import { Listing } from '../types';
+import { useProperties } from '../context/PropertyContext';
+import { Listing, HomeStackParamList } from '../types';
+import { Property } from '../lib/datafiniti';
+import { supabase } from '../lib/supabase';
+
+type MapScreenNavigationProp = StackNavigationProp<HomeStackParamList>;
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+// Combined property type for display
+type MapProperty = (Property & { source: 'external' }) | (Listing & { source: 'user' });
 
 export default function MapScreen() {
-  const { users } = useUser();
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const navigation = useNavigation<MapScreenNavigationProp>();
+  const { currentUser } = useUser();
+  const { properties: datafinitiProperties, selectedPropertyId, setSelectedPropertyId } = useProperties();
+  const [userListings, setUserListings] = useState<Listing[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<MapProperty | null>(null);
+  const mapRef = useRef<MapView>(null);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [region, setRegion] = useState({
     latitude: 37.7749, // Default to San Francisco
     longitude: -122.4194,
@@ -16,124 +32,257 @@ export default function MapScreen() {
     longitudeDelta: 0.1,
   });
 
-  // Get listings from homeowners (for now, we'll create mock data structure)
-  // In production, this would come from Supabase
+  // Fetch user listings from Supabase
   useEffect(() => {
-    // TODO: Fetch listings from Supabase
-    // For now, empty array - will be populated when listings are created
-    setListings([]);
+    const fetchUserListings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('listings')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching listings:', error);
+          return;
+        }
+
+        if (data) {
+          // Transform Supabase data to Listing format
+          const listings: Listing[] = data.map((item: any) => ({
+            id: item.id,
+            ownerId: item.owner_id,
+            title: item.title || '',
+            description: item.description || '',
+            address: item.address,
+            city: item.city,
+            state: item.state,
+            zipCode: item.zip_code || '',
+            price: item.price || 0,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            photos: [], // Will be fetched separately if needed
+            bedrooms: item.bedrooms,
+            bathrooms: item.bathrooms,
+            squareFeet: item.square_feet,
+            availableDate: item.available_date,
+            createdAt: new Date(item.created_at).getTime(),
+            updatedAt: new Date(item.updated_at).getTime(),
+          }));
+          setUserListings(listings);
+        }
+      } catch (error) {
+        console.error('Error fetching user listings:', error);
+      }
+    };
+
+    fetchUserListings();
   }, []);
 
-  const handleMarkerPress = (listing: Listing) => {
-    setSelectedListing(listing);
+  // Combine external properties and user listings
+  const allProperties: MapProperty[] = [
+    ...datafinitiProperties.map(p => ({ ...p, source: 'external' as const })),
+    ...userListings.map(l => ({ ...l, source: 'user' as const })),
+  ];
+
+  // Center map on selected property when selection changes
+  useEffect(() => {
+    if (selectedPropertyId && mapRef.current) {
+      const property = allProperties.find(p => p.id === selectedPropertyId);
+      if (property) {
+        mapRef.current.animateToRegion({
+          latitude: property.latitude,
+          longitude: property.longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }, 500);
+      }
+    }
+  }, [selectedPropertyId, datafinitiProperties, userListings]);
+
+  const handleMarkerPress = (property: MapProperty) => {
+    setSelectedProperty(property);
+    setSelectedPropertyId(property.id);
+    setCurrentPhotoIndex(0);
   };
 
   const closeModal = () => {
-    setSelectedListing(null);
+    setSelectedProperty(null);
+    setSelectedPropertyId(null);
+    setCurrentPhotoIndex(0);
+  };
+
+  const getPhotos = (property: MapProperty): string[] => {
+    if (property.source === 'user' && property.photos && property.photos.length > 0) {
+      return property.photos;
+    }
+    return []; // External properties get one photo assigned in ListingCard
+  };
+
+  const handleViewFullListing = () => {
+    if (selectedProperty) {
+      closeModal();
+      navigation.navigate('ListingDetail', { listing: selectedProperty });
+    }
+  };
+
+  const handlePreviousPhoto = () => {
+    if (selectedProperty) {
+      const photos = getPhotos(selectedProperty);
+      if (photos.length > 0) {
+        setCurrentPhotoIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1));
+      }
+    }
+  };
+
+  const handleNextPhoto = () => {
+    if (selectedProperty) {
+      const photos = getPhotos(selectedProperty);
+      if (photos.length > 0) {
+        setCurrentPhotoIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0));
+      }
+    }
   };
 
   return (
     <View style={styles.container}>
-      {listings.length === 0 ? (
-        // Empty State - Show as background when no listings
-        <View style={styles.emptyStateBackground}>
-          <Ionicons name="map-outline" size={64} color="#E8D5C4" />
-          <Text style={styles.emptyStateText}>No listings yet</Text>
-          <Text style={styles.emptyStateSubtext}>Listings will appear on the map once created</Text>
-        </View>
-      ) : (
-        // Map View - Only show when there are listings
-        <MapView
-          provider={PROVIDER_DEFAULT}
-          style={styles.map}
-          region={region}
-          onRegionChangeComplete={setRegion}
-          showsUserLocation={true}
-          showsMyLocationButton={true}
-          mapType="standard"
-        >
-          {listings.map((listing) => (
+      {/* Always show map */}
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_DEFAULT}
+        style={styles.map}
+        region={region}
+        onRegionChangeComplete={setRegion}
+        showsUserLocation={true}
+        showsMyLocationButton={true}
+        mapType="standard"
+      >
+        {allProperties.map((property) => {
+          const isMyListing = property.source === 'user' && currentUser && property.ownerId === currentUser.id;
+          const isSelected = selectedPropertyId === property.id;
+          return (
             <Marker
-              key={listing.id}
+              key={property.id}
               coordinate={{
-                latitude: listing.latitude,
-                longitude: listing.longitude,
+                latitude: property.latitude,
+                longitude: property.longitude,
               }}
-              onPress={() => handleMarkerPress(listing)}
+              onPress={() => handleMarkerPress(property)}
             >
               <View style={styles.markerContainer}>
-                <View style={styles.marker}>
-                  <Text style={styles.markerPrice}>${listing.price.toLocaleString()}</Text>
+                <View style={[
+                  isMyListing ? styles.markerMyListing : styles.marker,
+                  isSelected && styles.selectedMarker
+                ]}>
+                  <Text style={styles.markerPrice}>${property.price.toLocaleString()}</Text>
                 </View>
               </View>
             </Marker>
-          ))}
-        </MapView>
-      )}
+          );
+        })}
+      </MapView>
 
-      {/* Listing Detail Modal */}
+      {/* Property Detail Modal */}
       <Modal
-        visible={selectedListing !== null}
+        visible={selectedProperty !== null}
         transparent={true}
         animationType="slide"
         onRequestClose={closeModal}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
-              <Ionicons name="close" size={24} color="#6F4E37" />
-            </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={closeModal}
+        >
+          <TouchableOpacity 
+            activeOpacity={1} 
+            onPress={(e) => e.stopPropagation()}
+            style={styles.modalContentContainer}
+          >
+            <View style={styles.modalContent}>
+              <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+                <Ionicons name="close" size={24} color="#6F4E37" />
+              </TouchableOpacity>
 
-            {selectedListing && (
-              <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
-                {/* Photo Placeholder */}
-                <View style={styles.photoContainer}>
-                  {selectedListing.photos && selectedListing.photos.length > 0 ? (
-                    <Image
-                      source={{ uri: selectedListing.photos[0] }}
-                      style={styles.photo}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.photoPlaceholder}>
-                      <Ionicons name="home" size={64} color="#E8D5C4" />
-                      <Text style={styles.photoPlaceholderText}>No photo available</Text>
-                    </View>
-                  )}
+              {selectedProperty && (
+                <View style={styles.modalBody}>
+                  {/* Photo Slider */}
+                  <View style={styles.photoContainer}>
+                    {(() => {
+                      const photos = getPhotos(selectedProperty);
+                      if (photos.length > 0) {
+                        return (
+                          <>
+                            <Image
+                              source={{ uri: photos[currentPhotoIndex] }}
+                              style={styles.photo}
+                              resizeMode="cover"
+                            />
+                            {photos.length > 1 && (
+                              <>
+                                <TouchableOpacity
+                                  style={[styles.photoNavButton, styles.photoNavButtonLeft]}
+                                  onPress={handlePreviousPhoto}
+                                >
+                                  <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[styles.photoNavButton, styles.photoNavButtonRight]}
+                                  onPress={handleNextPhoto}
+                                >
+                                  <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+                                </TouchableOpacity>
+                                <View style={styles.photoIndicator}>
+                                  <Text style={styles.photoIndicatorText}>
+                                    {currentPhotoIndex + 1} / {photos.length}
+                                  </Text>
+                                </View>
+                              </>
+                            )}
+                          </>
+                        );
+                      } else {
+                        return (
+                          <View style={styles.photoPlaceholder}>
+                            <Ionicons name="home" size={64} color="#E8D5C4" />
+                            <Text style={styles.photoPlaceholderText}>No photo available</Text>
+                          </View>
+                        );
+                      }
+                    })()}
+                  </View>
+
+                  {/* Property Info */}
+                  <View style={styles.listingInfo}>
+                    <Text style={styles.price}>${selectedProperty.price.toLocaleString()}/mo</Text>
+                    
+                    {((selectedProperty.source === 'user' && (selectedProperty.bedrooms || selectedProperty.bathrooms)) ||
+                      (selectedProperty.source === 'external' && (selectedProperty.numBedrooms || selectedProperty.numBathrooms))) && (
+                      <View style={styles.detailsRow}>
+                        <Text style={styles.detailText}>
+                          {selectedProperty.source === 'user' 
+                            ? `${selectedProperty.bedrooms || 0} bed • ${selectedProperty.bathrooms || 0} bath`
+                            : `${selectedProperty.numBedrooms || 0} bed • ${selectedProperty.numBathrooms || 0} bath`
+                          }
+                        </Text>
+                      </View>
+                    )}
+
+                    <Text style={styles.address}>{selectedProperty.address}</Text>
+                    <Text style={styles.cityState}>
+                      {selectedProperty.city}, {selectedProperty.state}
+                      {selectedProperty.source === 'user' && selectedProperty.zipCode && ` ${selectedProperty.zipCode}`}
+                    </Text>
+
+                    <TouchableOpacity style={styles.viewFullButton} onPress={handleViewFullListing}>
+                      <Text style={styles.viewFullButtonText}>View Full Listing</Text>
+                      <Ionicons name="arrow-forward" size={20} color="#FFF5E1" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-
-                {/* Listing Info */}
-                <View style={styles.listingInfo}>
-                  <Text style={styles.price}>${selectedListing.price.toLocaleString()}</Text>
-                  <Text style={styles.address}>{selectedListing.address}</Text>
-                  <Text style={styles.cityState}>
-                    {selectedListing.city}, {selectedListing.state} {selectedListing.zipCode}
-                  </Text>
-                  
-                  {selectedListing.bedrooms && selectedListing.bathrooms && (
-                    <View style={styles.detailsRow}>
-                      <Text style={styles.detailText}>
-                        {selectedListing.bedrooms} bed • {selectedListing.bathrooms} bath
-                      </Text>
-                      {selectedListing.squareFeet && (
-                        <Text style={styles.detailText}> • {selectedListing.squareFeet} sq ft</Text>
-                      )}
-                    </View>
-                  )}
-
-                  {selectedListing.description && (
-                    <Text style={styles.description}>{selectedListing.description}</Text>
-                  )}
-
-                  <TouchableOpacity style={styles.messageButton}>
-                    <Ionicons name="mail" size={20} color="#FFF5E1" />
-                    <Text style={styles.messageButtonText}>Message Owner</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -164,6 +313,23 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  markerMyListing: {
+    backgroundColor: '#6F4E37',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  selectedMarker: {
+    borderWidth: 3,
+    borderColor: '#FF6B35',
+  },
   markerPrice: {
     color: '#FFFFFF',
     fontSize: 12,
@@ -174,18 +340,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  modalContentContainer: {
+    width: '100%',
+    height: SCREEN_HEIGHT * 0.5,
+    justifyContent: 'flex-end',
+  },
   modalContent: {
     backgroundColor: '#FFF5E1',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingTop: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '100%',
+    overflow: 'hidden',
   },
   closeButton: {
     position: 'absolute',
-    top: 20,
-    right: 20,
-    zIndex: 1,
+    top: 16,
+    right: 16,
+    zIndex: 10,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     width: 40,
@@ -194,14 +365,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E8D5C4',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  modalScrollView: {
+  modalBody: {
     flex: 1,
   },
   photoContainer: {
     width: '100%',
-    height: 250,
+    height: 200,
     backgroundColor: '#E8D5C4',
+    position: 'relative',
   },
   photo: {
     width: '100%',
@@ -219,8 +396,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#A68B7B',
   },
+  photoNavButton: {
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -20 }],
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  photoNavButtonLeft: {
+    left: 12,
+  },
+  photoNavButtonRight: {
+    right: 12,
+  },
+  photoIndicator: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    zIndex: 5,
+  },
+  photoIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   listingInfo: {
     padding: 20,
+    flex: 1,
   },
   price: {
     fontSize: 28,
@@ -229,31 +440,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   address: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     color: '#6F4E37',
+    marginTop: 8,
     marginBottom: 4,
   },
   cityState: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#A68B7B',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   detailsRow: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   detailText: {
     fontSize: 16,
     color: '#6F4E37',
+    fontWeight: '500',
   },
-  description: {
-    fontSize: 16,
-    color: '#6F4E37',
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  messageButton: {
+  viewFullButton: {
     backgroundColor: '#FF6B35',
     flexDirection: 'row',
     alignItems: 'center',
@@ -261,30 +468,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     gap: 8,
+    marginTop: 'auto',
   },
-  messageButtonText: {
+  viewFullButtonText: {
     color: '#FFF5E1',
     fontSize: 16,
     fontWeight: '600',
-  },
-  emptyStateBackground: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFF5E1',
-    paddingHorizontal: 40,
-  },
-  emptyStateText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#6F4E37',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#A68B7B',
-    textAlign: 'center',
   },
 });
 

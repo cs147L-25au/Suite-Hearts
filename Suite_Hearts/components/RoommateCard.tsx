@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, Image, Animated, PanResponder, Dimensions, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { User } from '../types';
@@ -10,42 +10,101 @@ interface Props {
   user: User;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
+  isExpanded?: boolean;
+  onExpand?: () => void;
+  onSwipeTrigger?: (triggerFn: (direction: 'left' | 'right') => void) => void;
+  onPromptPress?: (prompt: { id: string; promptText: string; answer: string }) => void;
 }
 
-export default function RoommateCard({ user, onSwipeLeft, onSwipeRight }: Props) {
+export default function RoommateCard({ user, onSwipeLeft, onSwipeRight, isExpanded = false, onExpand, onSwipeTrigger, onPromptPress }: Props) {
   const pan = useRef(new Animated.ValueXY()).current;
   const rotate = useRef(new Animated.Value(0)).current;
+  const swipeTriggered = useRef(false);
+
+  // Expose swipe function via callback
+  const triggerSwipe = useCallback((direction: 'left' | 'right') => {
+    if (swipeTriggered.current || isExpanded) return;
+    swipeTriggered.current = true;
+    
+    const targetX = direction === 'right' ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
+    const targetRotate = direction === 'right' ? 15 : -15;
+    
+    Animated.parallel([
+      Animated.timing(pan, {
+        toValue: { x: targetX, y: 0 },
+        duration: 300,
+        useNativeDriver: false,
+      }),
+      Animated.timing(rotate, {
+        toValue: targetRotate,
+        duration: 300,
+        useNativeDriver: false,
+      }),
+    ]).start(() => {
+      if (direction === 'right') {
+        onSwipeRight();
+      } else {
+        onSwipeLeft();
+      }
+      pan.setValue({ x: 0, y: 0 });
+      rotate.setValue(0);
+      swipeTriggered.current = false;
+    });
+  }, [isExpanded, onSwipeLeft, onSwipeRight]);
+
+  // Expose triggerSwipe to parent
+  useEffect(() => {
+    if (onSwipeTrigger) {
+      onSwipeTrigger(triggerSwipe);
+    }
+  }, [onSwipeTrigger, triggerSwipe]);
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        if (isExpanded) return false;
+        // Only respond to horizontal swipes, allow vertical scrolling and taps
+        // Require significant horizontal movement to start swipe
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 15;
+      },
       onPanResponderMove: (evt, gestureState) => {
-        pan.setValue({ x: gestureState.dx, y: gestureState.dy });
-        rotate.setValue(gestureState.dx / 10);
+        // Only handle horizontal movement for swiping
+        if (Math.abs(gestureState.dx) > Math.abs(gestureState.dy)) {
+          pan.setValue({ x: gestureState.dx, y: 0 });
+          rotate.setValue(gestureState.dx / 20); // Adjusted for new range
+        }
       },
       onPanResponderRelease: (evt, gestureState) => {
+        if (swipeTriggered.current) return;
+        
         if (Math.abs(gestureState.dx) > SWIPE_THRESHOLD) {
-          // Swipe detected
+          // Swipe detected - complete fling animation
+          swipeTriggered.current = true;
+          const direction = gestureState.dx > 0 ? 'right' : 'left';
+          const targetX = direction === 'right' ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
+          const targetRotate = direction === 'right' ? 30 : -30;
+          
           Animated.parallel([
             Animated.timing(pan, {
-              toValue: { x: gestureState.dx > 0 ? SCREEN_WIDTH + 100 : -SCREEN_WIDTH - 100, y: gestureState.dy },
-              duration: 200,
+              toValue: { x: targetX, y: gestureState.dy * 0.5 },
+              duration: 300,
               useNativeDriver: false,
             }),
             Animated.timing(rotate, {
-              toValue: gestureState.dx > 0 ? 1 : -1,
-              duration: 200,
+              toValue: targetRotate,
+              duration: 300,
               useNativeDriver: false,
             }),
           ]).start(() => {
-            if (gestureState.dx > 0) {
+            if (direction === 'right') {
               onSwipeRight();
             } else {
               onSwipeLeft();
             }
             pan.setValue({ x: 0, y: 0 });
             rotate.setValue(0);
+            swipeTriggered.current = false;
           });
         } else {
           // Return to center
@@ -65,8 +124,8 @@ export default function RoommateCard({ user, onSwipeLeft, onSwipeRight }: Props)
   ).current;
 
   const rotateInterpolate = rotate.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-10deg', '0deg', '10deg'],
+    inputRange: [-30, 0, 30],
+    outputRange: ['-30deg', '0deg', '30deg'],
   });
 
   const likeOpacity = pan.x.interpolate({
@@ -93,8 +152,18 @@ export default function RoommateCard({ user, onSwipeLeft, onSwipeRight }: Props)
           ],
         },
       ]}
-      {...panResponder.panHandlers}
+      {...(!isExpanded ? panResponder.panHandlers : {})}
     >
+      {!isExpanded && onExpand && (
+        <TouchableOpacity
+          activeOpacity={0.95}
+          onPress={() => {
+            onExpand();
+          }}
+          style={StyleSheet.absoluteFill}
+          delayPressIn={0}
+        />
+      )}
       {/* Like/Nope Overlays */}
       <Animated.View style={[styles.overlay, styles.likeOverlay, { opacity: likeOpacity }]}>
         <Text style={styles.overlayText}>LIKE</Text>
@@ -115,10 +184,17 @@ export default function RoommateCard({ user, onSwipeLeft, onSwipeRight }: Props)
       </View>
 
       {/* Info Section - Scrollable */}
-      <ScrollView style={styles.infoContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.infoContainer} 
+        contentContainerStyle={styles.infoContentContainer}
+        showsVerticalScrollIndicator={true}
+        nestedScrollEnabled={true}
+        scrollEnabled={true}
+      >
         <View style={styles.header}>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.age}>{user.age}</Text>
+          <Text style={styles.nameAge}>
+            {user.name}{user.age ? `, ${user.age}` : ''}
+          </Text>
         </View>
 
         <View style={styles.details}>
@@ -143,6 +219,23 @@ export default function RoommateCard({ user, onSwipeLeft, onSwipeRight }: Props)
           <Text style={styles.bio}>{user.bio}</Text>
         </View>
 
+        {/* Prompts Section */}
+        {user.prompts && user.prompts.length > 0 && (
+          <View style={styles.promptsSection}>
+            {user.prompts.map((prompt, index) => (
+              <TouchableOpacity 
+                key={prompt.id} 
+                style={styles.promptCard}
+                onPress={() => onPromptPress && onPromptPress(prompt)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.promptQuestion}>{prompt.promptText}</Text>
+                <Text style={styles.promptAnswer}>{prompt.answer}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <View style={styles.preferences}>
           <Text style={styles.preferencesLabel}>Preferences</Text>
           <View style={styles.preferencesGrid}>
@@ -163,30 +256,6 @@ export default function RoommateCard({ user, onSwipeLeft, onSwipeRight }: Props)
               <Text style={styles.preferenceValue}>{user.nightOwl}</Text>
             </View>
           </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.passButton]}
-            onPress={onSwipeLeft}
-          >
-            <Ionicons name="close" size={32} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.messageButton]}
-            onPress={() => {
-              // TODO: Navigate to message screen
-            }}
-          >
-            <Ionicons name="mail" size={24} color="#6F4E37" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.likeButton]}
-            onPress={onSwipeRight}
-          >
-            <Ionicons name="heart" size={32} color="#FFFFFF" />
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </Animated.View>
@@ -254,20 +323,16 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  infoContentContainer: {
+    paddingBottom: 20,
+  },
   header: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
     marginBottom: 12,
   },
-  name: {
+  nameAge: {
     fontSize: 32,
     fontWeight: '700',
     color: '#6F4E37',
-    marginRight: 12,
-  },
-  age: {
-    fontSize: 24,
-    color: '#A68B7B',
   },
   details: {
     marginBottom: 20,
@@ -295,6 +360,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6F4E37',
     lineHeight: 24,
+  },
+  promptsSection: {
+    marginBottom: 20,
+    gap: 12,
+  },
+  promptCard: {
+    backgroundColor: '#FFF5E1',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#FF6B35',
+  },
+  promptQuestion: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6F4E37',
+    marginBottom: 8,
+  },
+  promptAnswer: {
+    fontSize: 16,
+    color: '#6F4E37',
+    lineHeight: 22,
   },
   preferences: {
     marginBottom: 20,
@@ -326,36 +413,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#6F4E37',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 20,
-    gap: 20,
-  },
-  actionButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  passButton: {
-    backgroundColor: '#F44336',
-  },
-  messageButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E8D5C4',
-  },
-  likeButton: {
-    backgroundColor: '#4CAF50',
   },
 });
 

@@ -1,614 +1,613 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Image, Modal, FlatList } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Image, Alert } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '@types';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useUser } from '../context/UserContext';
 import { User } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   navigation: StackNavigationProp<RootStackParamList, 'SignUp'>;
+  route?: { params?: { email?: string } };
 }
 
 type UserType = 'homeowner' | 'searcher' | '';
 type LookingFor = 'roommates' | 'housing' | 'both' | '';
 
-export default function SignUpScreen({ navigation }: Props) {
-  const { addUser, setCurrentUser } = useUser();
+export default function SignUpScreen({ navigation, route }: Props) {
+  const { addUser, setCurrentUser, updateUser } = useUser();
   const [step, setStep] = useState(0);
   const [userType, setUserType] = useState<UserType>('');
   const [lookingFor, setLookingFor] = useState<LookingFor>('');
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [code, setCode] = useState('');
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
+    email: route?.params?.email || '',
     phone: '',
     name: '',
-    age: '',
-    race: '',
-    gender: '',
-    university: '',
-    yearsExperience: '',
-    job: '',
     profilePicture: null as string | null,
-    hometown: '',
-    location: '',
-    pets: '',
-    smoking: '',
-    drinking: '',
-    drugs: '',
-    nightOwl: '',
-    religion: '',
-    bio: '',
-    questions: ['', '', '', '', ''],
-    // New housing preferences
-    maxRoommates: '',
-    roommateType: '',
-    preferredCity: '',
-    preferredLatitude: null as number | null,
-    preferredLongitude: null as number | null,
-    spaceType: '',
-    minBudget: '',
-    maxBudget: '',
-    leaseDuration: '',
   });
-  const [dropdownVisible, setDropdownVisible] = useState(false);
-  const [dropdownOptions, setDropdownOptions] = useState<string[]>([]);
-  const [dropdownKey, setDropdownKey] = useState<string>('');
 
-  // Dropdown options
-  const ageOptions = Array.from({ length: 86 }, (_, i) => (i + 14).toString());
-  const raceOptions = [
-    'East Asian',
-    'Black',
-    'Pacific Islander',
-    'Native American',
-    'White',
-    'Hispanic',
-    'Middle Eastern',
-    'South Asian',
-    'South East Asian',
-    'Mixed',
-    'Jewish',
-    'Prefer Not To Say',
-  ];
-  const universityOptions = ['Stanford', 'N/A'];
-  const cityOptions = ['Palo Alto', 'SF', 'SJ', 'Berkeley'];
-  const roommateTypeOptions = ['Roommates', 'Suitemates', 'Both'];
-  const spaceTypeOptions = ['Condo', 'Townhome', 'House', 'Dorm'];
-  const leaseDurationOptions = Array.from({ length: 12 }, (_, i) => `${i + 1} month${i > 0 ? 's' : ''}`);
+  // Generate a UUID v4
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
 
-  // Calculate total steps based on user type
-  const getTotalSteps = () => {
-    if (userType === 'homeowner') {
-      return 19; // email, phone, name, age, race, gender, yearsExperience, job, profile, hometown, location, smoking, drinking, drugs, nightOwl, religion, bio
-    } else {
-      // Base questions + housing questions if looking for housing
-      const baseCount = 20; // email, phone, name, age, race, gender, university, job, profile, hometown, location, pets, smoking, drinking, drugs, nightOwl, religion, bio
-      const housingCount = (lookingFor === 'housing' || lookingFor === 'both') ? 8 : 0; // 8 new housing questions
-      return baseCount + housingCount;
+  const handleImagePicker = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant camera roll permissions to upload a photo.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setFormData({ ...formData, profilePicture: result.assets[0].uri });
     }
   };
 
-  // Get current question index (0-based for questionnaire)
-  const getQuestionIndex = () => {
-    if (userType === 'homeowner') {
-      return step - 1; // Step 0 is selection, step 1+ are questions
-    } else {
-      return step - 2; // Steps 0-1 are selection screens, step 2+ are questions
+  const handleRequestCode = async () => {
+    if (!formData.email || !formData.email.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    try {
+      // Request OTP code from Supabase
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formData.email.toLowerCase(),
+        options: {
+          emailRedirectTo: undefined,
+        },
+      });
+
+      if (error) {
+        console.error('Error requesting OTP:', error);
+        Alert.alert('Error', error.message || 'Failed to send code. Please try again.');
+        setIsVerifyingCode(false);
+        return;
+      }
+
+      // Code sent successfully
+      setCodeSent(true);
+    } catch (error) {
+      console.error('Error requesting code:', error);
+      Alert.alert('Error', 'Failed to send code. Please try again.');
+    } finally {
+      setIsVerifyingCode(false);
     }
   };
 
-  // Get all questions for current user type
-  const getQuestions = () => {
-    const baseQuestions = [
-      { key: 'email', label: 'What is your email?', type: 'email' },
-      { key: 'phone', label: 'What is your phone number?', type: 'phone' },
-      { key: 'name', label: 'What is your name?', type: 'text' },
-      { key: 'age', label: 'What is your age?', type: 'age' },
-      { key: 'race', label: 'What is your race?', type: 'race' },
-      { key: 'gender', label: 'What is your gender?', type: 'text' },
-    ];
-
-    const lifestyleQuestions = [
-      { key: 'smoking', label: 'Do you smoke?', type: 'yesnodontcare' },
-      { key: 'drinking', label: 'Do you drink?', type: 'yesnodontcare' },
-      { key: 'drugs', label: 'Do you use drugs?', type: 'yesnodontcare' },
-      { key: 'nightOwl', label: 'Are you a night owl or early bird?', type: 'nightowl' },
-      { key: 'religion', label: 'What is your religion?', type: 'text' },
-      { key: 'bio', label: 'Write a bio (10-50 words)', type: 'bio' },
-    ];
-
-    if (userType === 'homeowner') {
-      return [
-        ...baseQuestions,
-        { key: 'yearsExperience', label: 'How many years of experience do you have renting/hosting?', type: 'number' },
-        { key: 'job', label: 'What is your job?', type: 'text' },
-        { key: 'profilePicture', label: 'Upload your profile picture', type: 'image' },
-        { key: 'hometown', label: 'Where are you from?', type: 'text' },
-        { key: 'location', label: 'Where are you based now?', type: 'text' },
-        ...lifestyleQuestions,
-      ];
-    } else {
-      // Searcher questions
-      const housingQuestions = lookingFor === 'housing' || lookingFor === 'both' ? [
-        { key: 'maxRoommates', label: 'Up to how many people are you okay with living with?', type: 'number' },
-        { key: 'roommateType', label: 'Roommates or suitemates or both?', type: 'roommateType' },
-        { key: 'preferredCity', label: 'What city do you want to live in?', type: 'city' },
-        { key: 'preferredLocation', label: 'Pin exact coordinates on map (Optional)', type: 'mapPin' },
-        { key: 'spaceType', label: 'What kind of space?', type: 'spaceType' },
-        { key: 'minBudget', label: 'Minimum monthly budget?', type: 'number' },
-        { key: 'maxBudget', label: 'Maximum monthly budget?', type: 'number' },
-        { key: 'leaseDuration', label: 'How long of a period?', type: 'leaseDuration' },
-      ] : [];
-
-      return [
-        ...baseQuestions,
-        { key: 'university', label: 'What is your university affiliation? (Optional)', type: 'university' },
-        { key: 'job', label: 'What is your job?', type: 'text' },
-        { key: 'profilePicture', label: 'Upload your profile picture', type: 'image' },
-        { key: 'hometown', label: 'Where are you from?', type: 'text' },
-        { key: 'location', label: 'Where are you looking to live?', type: 'text' },
-        { key: 'pets', label: 'Do you have pets?', type: 'yesnodontcare' },
-        ...housingQuestions, // Add housing questions if looking for housing
-        ...lifestyleQuestions,
-      ];
+  const handleVerifyCode = async () => {
+    if (!code || code.length !== 6 || !/^\d{6}$/.test(code)) {
+      Alert.alert('Invalid Code', 'Please enter a valid 6-digit code.');
+      return;
     }
-  };
 
-  const questions = getQuestions();
-  const questionIndex = getQuestionIndex();
-  const totalSteps = getTotalSteps();
-  const currentQuestion = questions[questionIndex];
-  const progress = userType ? ((questionIndex + 1) / totalSteps) * 100 : 0;
+    setIsVerifyingCode(true);
+    try {
+      // Verify OTP code with Supabase (6-digit code)
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: formData.email.toLowerCase(),
+        token: code,
+        type: 'email',
+      });
 
-  const updateFormData = (key: string, value: string) => {
-    if (key.startsWith('question')) {
-      const qIndex = parseInt(key.replace('question', '')) - 1;
-      const updatedQuestions = [...formData.questions];
-      updatedQuestions[qIndex] = value;
-      setFormData({ ...formData, questions: updatedQuestions });
-    } else {
-      setFormData({ ...formData, [key]: value });
+      if (error || !data) {
+        Alert.alert('Invalid Code', error?.message || 'The code you entered is incorrect. Please try again.');
+        setIsVerifyingCode(false);
+        return;
+      }
+
+      // Email verified successfully
+      setEmailVerified(true);
+      setStep(2); // Move to phone step
+      Alert.alert('Email Verified', 'Your email has been verified!');
+    } catch (error) {
+      console.error('Error verifying code:', error);
+      Alert.alert('Error', 'Failed to verify code. Please try again.');
+    } finally {
+      setIsVerifyingCode(false);
     }
-  };
-
-  const getFormValue = (key: string) => {
-    if (key.startsWith('question')) {
-      const qIndex = parseInt(key.replace('question', '')) - 1;
-      return formData.questions[qIndex];
-    }
-    if (key === 'preferredLocation') {
-      return formData.preferredLatitude && formData.preferredLongitude 
-        ? `${formData.preferredLatitude.toFixed(4)}, ${formData.preferredLongitude.toFixed(4)}`
-        : '';
-    }
-    const value = formData[key as keyof typeof formData];
-    return value !== null && value !== undefined ? String(value) : '';
-  };
-
-  const getWordCount = (text: string) => {
-    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
   };
 
   const handleNext = () => {
-    // Validate bio if it's the bio question
-    if (currentQuestion?.key === 'bio') {
-      const wordCount = getWordCount(formData.bio);
-      if (wordCount < 10 || wordCount > 50) {
-        // Don't proceed if bio doesn't meet requirements
+    if (step === 0) {
+      // User type selection
+      if (!userType) {
+        Alert.alert('Required', 'Please select whether you are a homeowner or searcher.');
         return;
       }
-    }
-
-    if (questionIndex < questions.length - 1) {
-      setStep(step + 1);
-    } else {
-      // Sign up complete - save user data
+      setStep(1);
+    } else if (step === 1) {
+      // Email verification
+      if (!formData.email || !formData.email.includes('@')) {
+        Alert.alert('Invalid Email', 'Please enter a valid email address.');
+        return;
+      }
+      if (!emailVerified) {
+        // Request code if not verified yet
+        handleRequestCode();
+        return;
+      }
+      // If already verified, move to next step
+      setStep(2);
+    } else if (step === 2) {
+      // Phone - validate 10 digits (without formatting)
+      const phoneDigits = formData.phone.replace(/\D/g, '');
+      if (!phoneDigits || phoneDigits.length !== 10) {
+        Alert.alert('Invalid Phone', 'Please enter a valid 10-digit phone number.');
+        return;
+      }
+      setStep(3);
+    } else if (step === 3) {
+      // Name
+      if (!formData.name || formData.name.trim().length < 2) {
+        Alert.alert('Invalid Name', 'Please enter your name.');
+        return;
+      }
+      setStep(4);
+    } else if (step === 4) {
+      // Profile picture (optional but recommended)
       handleSignUpComplete();
     }
   };
 
+  const handleBack = () => {
+    if (step > 0) {
+      setStep(step - 1);
+    } else {
+      navigation.goBack();
+    }
+  };
+
   const handleSignUpComplete = async () => {
+    // Verify email is verified before completing signup
+    if (!emailVerified) {
+      Alert.alert('Email Not Verified', 'Please verify your email before completing signup.');
+      return;
+    }
+
+    // Create user with minimal required fields
+    // All other fields will be empty/null and filled in profile screen
+    // Format phone number with country code
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    const formattedPhone = phoneDigits.length === 10 ? `+1${phoneDigits}` : formData.phone;
+
+    // Get the authenticated user's ID from Supabase Auth
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const userId = authUser?.id || generateUUID();
+
     const newUser: User = {
-      id: `${Date.now()}-${Math.random()}`,
+      id: userId,
       userType: userType as 'homeowner' | 'searcher',
       lookingFor: userType === 'searcher' ? lookingFor as 'roommates' | 'housing' | 'both' : undefined,
       email: formData.email,
-      phone: formData.phone,
+      phone: formattedPhone,
       name: formData.name,
-      age: formData.age,
-      race: formData.race,
-      gender: formData.gender,
-      university: userType === 'searcher' ? formData.university : undefined,
-      yearsExperience: userType === 'homeowner' ? formData.yearsExperience : undefined,
-      job: formData.job,
       profilePicture: formData.profilePicture,
-      hometown: formData.hometown,
-      location: formData.location,
-      pets: userType === 'searcher' ? formData.pets : undefined,
-      smoking: formData.smoking,
-      drinking: formData.drinking,
-      drugs: formData.drugs,
-      nightOwl: formData.nightOwl,
-      religion: formData.religion,
-      bio: formData.bio,
-      questions: formData.questions,
-      // New housing preferences
-      maxRoommates: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both')) ? parseInt(formData.maxRoommates) : undefined,
-      roommateType: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both')) ? (formData.roommateType.toLowerCase() as 'roommates' | 'suitemates' | 'both') : undefined,
-      preferredCity: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both')) ? formData.preferredCity : undefined,
-      preferredLatitude: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both') && formData.preferredLatitude !== null) ? formData.preferredLatitude : undefined,
-      preferredLongitude: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both') && formData.preferredLongitude !== null) ? formData.preferredLongitude : undefined,
-      spaceType: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both')) ? (formData.spaceType as 'Condo' | 'Townhome' | 'House' | 'Dorm') : undefined,
-      minBudget: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both')) ? parseFloat(formData.minBudget) : undefined,
-      maxBudget: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both')) ? parseFloat(formData.maxBudget) : undefined,
-      leaseDuration: (userType === 'searcher' && (lookingFor === 'housing' || lookingFor === 'both')) ? parseInt(formData.leaseDuration) : undefined,
+      // All other fields start empty - will be filled in profile
+    age: '',
+    race: '',
+    gender: '',
+    job: '',
+      hometown: '',
+      location: '',
+      smoking: '',
+      drinking: '',
+      drugs: '',
+      nightOwl: '',
+      religion: '',
+      bio: '',
+      questions: [],
       createdAt: Date.now(),
     };
 
-    await addUser(newUser);
-    await setCurrentUser(newUser);
-    navigation.navigate('Home');
-  };
-
-  const handleBack = () => {
-    if (step === 0) {
-      // Go back to Introduction screen
-      navigation.goBack();
-    } else if (step === 1 && userType === 'searcher') {
-      // Go back to user type selection
-      setStep(0);
-      setUserType('');
-      setLookingFor('');
-    } else if (step === 1 && userType === 'homeowner') {
-      // Go back to user type selection
-      setStep(0);
-      setUserType('');
-    } else {
-      // Go back to previous question
-      setStep(step - 1);
-    }
-  };
-
-  const handleImageUpload = async () => {
+    // Check if user with this email already exists
     try {
-      // Request permission
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Sorry, we need camera roll permissions to upload photos!');
+      // First, try to find existing user by email
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', newUser.email.toLowerCase())
+        .limit(1);
+
+      let userId = newUser.id;
+      let shouldUpdate = false;
+
+      // If we found a user, use their ID and update
+      if (existingUsers && existingUsers.length > 0) {
+        userId = existingUsers[0].id;
+        shouldUpdate = true;
+        newUser.id = userId; // Use existing ID
+      }
+
+      // Save to local storage
+      if (shouldUpdate) {
+        // Update existing user in local storage if found
+        await updateUser(userId, newUser);
+      } else {
+        await addUser(newUser);
+      }
+      await setCurrentUser(newUser);
+      
+      // Save to Supabase (upsert - update if exists, insert if not)
+      // When updating, completely overwrite with new signup data
+      const userData = {
+        id: userId,
+        user_type: newUser.userType,
+        looking_for: newUser.lookingFor,
+        email: newUser.email.toLowerCase(),
+        phone: newUser.phone,
+        name: newUser.name,
+        profile_picture_url: newUser.profilePicture,
+        // Completely reset all other fields to null/empty (overwrite existing profile)
+        age: null,
+        race: null,
+        gender: null,
+        university: null,
+        years_experience: null,
+        job: null,
+        job_role: null,
+        job_place: null,
+        hometown: null,
+        location: null,
+        pets: null,
+        smoking: null,
+        drinking: null,
+        drugs: null,
+        night_owl: null,
+        religion: null,
+        bio: null,
+        questions: [],
+        prompts: null,
+        max_roommates: null,
+        roommate_type: null,
+        preferred_city: null,
+        preferred_latitude: null,
+        preferred_longitude: null,
+        space_type: null,
+        min_budget: null,
+        max_budget: null,
+        lease_duration: null,
+      };
+
+      let error;
+      if (shouldUpdate) {
+        // Update existing user
+        const { error: updateError } = await supabase
+          .from('users')
+          .update(userData)
+          .eq('id', userId);
+        error = updateError;
+      } else {
+        // Try to insert, but if it fails due to duplicate email, update instead
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert(userData);
+        
+        if (insertError && insertError.code === '23505') {
+          // Duplicate email - fetch the existing user and update
+          const { data: existingUserData } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', newUser.email.toLowerCase())
+            .single();
+          
+          if (existingUserData) {
+            userId = existingUserData.id;
+            newUser.id = userId;
+            await setCurrentUser(newUser);
+            await updateUser(userId, newUser);
+            
+            const { error: updateError } = await supabase
+              .from('users')
+              .update(userData)
+              .eq('id', userId);
+            error = updateError;
+          } else {
+            error = insertError;
+          }
+        } else {
+          error = insertError;
+        }
+      }
+
+      if (error) {
+        console.error('Error saving to Supabase:', error);
+        Alert.alert('Error', 'Failed to save account. Please try again.');
         return;
       }
 
-      // Launch image picker
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        setFormData({ ...formData, profilePicture: result.assets[0].uri });
-      }
+      // Navigate to home
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+  });
     } catch (error) {
-      console.error('Error picking image:', error);
-      alert('Failed to pick image. Please try again.');
+      console.error('Error saving to Supabase:', error);
+      Alert.alert('Error', 'Failed to save account. Please try again.');
     }
   };
 
-  const openDropdown = (key: string, options: string[]) => {
-    setDropdownKey(key);
-    setDropdownOptions(options);
-    setDropdownVisible(true);
-  };
-
-  const selectDropdownOption = (option: string) => {
-    updateFormData(dropdownKey, option);
-    setDropdownVisible(false);
-  };
-
-  const renderProgressBar = () => {
-    if (!userType) return null;
-    return (
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${progress}%` }]} />
-        </View>
-      </View>
-    );
-  };
-
-  const renderSelectionScreen = () => {
+  const renderStep = () => {
     if (step === 0) {
+      // User Type Selection
       return (
-        <View style={styles.centerContent}>
-          <Text style={styles.title}>Are you listing a home or looking for a place to stay?</Text>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.squareButton, userType === 'homeowner' && styles.squareButtonSelected]}
-              onPress={() => {
-                setUserType('homeowner');
-                setStep(1); // Go directly to questions for homeowner
-              }}
-            >
-              <Text style={[styles.squareButtonText, userType === 'homeowner' && styles.squareButtonTextSelected]}>
-                Listing a Home
-              </Text>
-          </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.squareButton, userType === 'searcher' && styles.squareButtonSelected]}
-              onPress={() => {
-                setUserType('searcher');
-                setStep(1);
-              }}
-            >
-              <Text style={[styles.squareButtonText, userType === 'searcher' && styles.squareButtonTextSelected]}>
-                Looking for a Place
-              </Text>
-          </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={[styles.navButton, styles.backButton, { marginTop: 30 }]}
-            onPress={handleBack}
-          >
-            <Ionicons name="chevron-back" size={24} color="#6F4E37" />
-            <Text style={[styles.navButtonText, styles.backButtonText]}>Back</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    if (step === 1 && userType === 'searcher') {
-      return (
-        <View style={styles.centerContent}>
+        <View style={styles.stepContainer}>
           <Text style={styles.title}>What are you looking for?</Text>
-          <View style={styles.buttonGrid}>
-            <TouchableOpacity
-              style={[styles.squareButton, lookingFor === 'roommates' && styles.squareButtonSelected]}
-              onPress={() => {
-                setLookingFor('roommates');
-                setStep(2);
-              }}
-            >
-              <Text style={[styles.squareButtonText, lookingFor === 'roommates' && styles.squareButtonTextSelected]}>
-                Just Roommates
-              </Text>
-          </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.squareButton, lookingFor === 'housing' && styles.squareButtonSelected]}
-              onPress={() => {
-                setLookingFor('housing');
-                setStep(2);
-              }}
-            >
-              <Text style={[styles.squareButtonText, lookingFor === 'housing' && styles.squareButtonTextSelected]}>
-                Just Housing
-              </Text>
-          </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.squareButton, lookingFor === 'both' && styles.squareButtonSelected]}
-              onPress={() => {
-                setLookingFor('both');
-                setStep(2);
-              }}
-            >
-              <Text style={[styles.squareButtonText, lookingFor === 'both' && styles.squareButtonTextSelected]}>
-                Roommates + Housing
-              </Text>
-            </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          style={[styles.navButton, styles.backButton, { marginTop: 30 }]}
-          onPress={handleBack}
-        >
-          <Ionicons name="chevron-back" size={24} color="#6F4E37" />
-          <Text style={[styles.navButtonText, styles.backButtonText]}>Back</Text>
-        </TouchableOpacity>
-        </View>
-      );
-    }
-
-    return null;
-  };
-
-  const renderButtonSelection = (options: string[], selectedValue: string, onSelect: (value: string) => void) => {
-    return (
-      <View style={styles.buttonSelectionContainer}>
-        {options.map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[styles.selectionButton, selectedValue === option && styles.selectionButtonSelected]}
-            onPress={() => onSelect(option)}
-          >
-            <Text style={[styles.selectionButtonText, selectedValue === option && styles.selectionButtonTextSelected]}>
-              {option}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
-  const renderDropdown = (options: string[], selectedValue: string, onSelect: (value: string) => void) => {
-    return (
-      <TouchableOpacity
-        style={styles.dropdownButton}
-        onPress={() => openDropdown(currentQuestion.key, options)}
-      >
-        <Text style={[styles.dropdownButtonText, !selectedValue && styles.dropdownButtonTextPlaceholder]}>
-          {selectedValue || 'Select an option'}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color="#6F4E37" />
-      </TouchableOpacity>
-    );
-  };
-
-  const renderQuestionScreen = () => {
-    // Don't show questions if we're still in selection phase
-    if (step === 0 || (step === 1 && userType === 'searcher' && !lookingFor)) {
-      return null;
-    }
-    if (!currentQuestion || (userType === 'searcher' && !lookingFor)) return null;
-
-    const value = getFormValue(currentQuestion.key);
-    const wordCount = currentQuestion.key === 'bio' ? getWordCount(formData.bio) : 0;
-    const bioValid = currentQuestion.key === 'bio' ? (wordCount >= 10 && wordCount <= 50) : true;
-
-    return (
-      <View style={styles.centerContent}>
-        <Text style={styles.questionTitle}>{currentQuestion.label}</Text>
-        
-        {currentQuestion.type === 'image' ? (
-          <View style={styles.imageUploadContainer}>
-            <TouchableOpacity style={styles.imageUploadButton} onPress={handleImageUpload}>
-              {formData.profilePicture ? (
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: formData.profilePicture }} style={styles.imagePreview} />
-                  <View style={styles.imageOverlay}>
-                    <Ionicons name="checkmark-circle" size={32} color="#FF6B35" />
-                    <Text style={styles.imageUploadText}>Photo uploaded</Text>
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.imageUploadPlaceholder}>
-                  <Ionicons name="camera" size={48} color="#FF6B35" />
-                  <Text style={styles.imageUploadText}>Tap to upload photo</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        ) : currentQuestion.type === 'age' ? (
-          renderDropdown(ageOptions, value, (selected) => updateFormData(currentQuestion.key, selected))
-        ) : currentQuestion.type === 'race' ? (
-          renderDropdown(raceOptions, value, (selected) => updateFormData(currentQuestion.key, selected))
-        ) : currentQuestion.type === 'university' ? (
-          renderDropdown(universityOptions, value, (selected) => updateFormData(currentQuestion.key, selected))
-        ) : currentQuestion.type === 'roommateType' ? (
-          renderDropdown(roommateTypeOptions, value, (selected) => updateFormData(currentQuestion.key, selected))
-        ) : currentQuestion.type === 'city' ? (
-          renderDropdown(cityOptions, value, (selected) => updateFormData(currentQuestion.key, selected))
-        ) : currentQuestion.type === 'spaceType' ? (
-          renderDropdown(spaceTypeOptions, value, (selected) => updateFormData(currentQuestion.key, selected))
-        ) : currentQuestion.type === 'leaseDuration' ? (
-          renderDropdown(leaseDurationOptions, value, (selected) => updateFormData(currentQuestion.key, selected))
-        ) : currentQuestion.type === 'mapPin' ? (
-          <View style={styles.mapPinContainer}>
-            <Text style={styles.mapPinText}>Map pinning will be implemented</Text>
-            <TouchableOpacity
-              style={styles.mapPinButton}
-              onPress={() => {
-                // TODO: Open map to pin location
-                // For now, skip this step
-                handleNext();
-              }}
-            >
-              <Text style={styles.mapPinButtonText}>Skip for now</Text>
-            </TouchableOpacity>
-          </View>
-        ) : currentQuestion.type === 'yesnodontcare' ? (
-          renderButtonSelection(
-            ['Yes', 'No', "Don't Care"],
-            value,
-            (selected) => updateFormData(currentQuestion.key, selected)
-          )
-        ) : currentQuestion.type === 'nightowl' ? (
-          renderButtonSelection(
-            ['Night Owl', 'Early Bird'],
-            value,
-            (selected) => updateFormData(currentQuestion.key, selected)
-          )
-        ) : currentQuestion.type === 'bio' ? (
-          <View style={styles.bioContainer}>
-            <TextInput
-              style={[styles.input, styles.bioInput]}
-              placeholder="Tell us about yourself (10-50 words)"
-              value={value}
-              onChangeText={(text) => updateFormData(currentQuestion.key, text)}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-            <Text style={[styles.wordCount, !bioValid && styles.wordCountError]}>
-              {wordCount} / 10-50 words
-            </Text>
-          </View>
-        ) : (
-          <TextInput
-            style={styles.input}
-            placeholder={`Enter ${currentQuestion.label.toLowerCase()}`}
-            value={value}
-            onChangeText={(text) => updateFormData(currentQuestion.key, text)}
-            keyboardType={currentQuestion.type === 'email' ? 'email-address' : currentQuestion.type === 'phone' ? 'phone-pad' : currentQuestion.type === 'number' ? 'numeric' : 'default'}
-            autoCapitalize={currentQuestion.type === 'text' ? 'words' : 'none'}
-          />
-        )}
-
-        <View style={styles.navigationButtons}>
-          <TouchableOpacity
-            style={[styles.navButton, styles.backButton]}
-            onPress={handleBack}
-          >
-            <Ionicons name="chevron-back" size={24} color="#6F4E37" />
-            <Text style={[styles.navButtonText, styles.backButtonText]}>Back</Text>
-          </TouchableOpacity>
+          <Text style={styles.subtitle}>Select your role to get started</Text>
           
           <TouchableOpacity
-            style={[styles.navButton, styles.nextButton, (!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)) && styles.navButtonDisabled]}
-            onPress={handleNext}
-            disabled={!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)}
+            style={[styles.optionButton, userType === 'homeowner' && styles.optionButtonSelected]}
+            onPress={() => {
+              setUserType('homeowner');
+              setLookingFor('');
+            }}
           >
-            <Text style={[styles.navButtonText, styles.nextButtonText, (!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)) && styles.navButtonTextDisabled]}>Next</Text>
-            <Ionicons name="chevron-forward" size={24} color={(!bioValid || (currentQuestion.type === 'image' && !formData.profilePicture)) ? '#D3D3D3' : '#FFF5E1'} />
+            <Ionicons name="home" size={32} color={userType === 'homeowner' ? '#FFF5E1' : '#6F4E37'} />
+            <Text style={[styles.optionText, userType === 'homeowner' && styles.optionTextSelected]}>
+              I'm a Homeowner
+            </Text>
+            <Text style={[styles.optionSubtext, userType === 'homeowner' && styles.optionSubtextSelected]}>
+              I want to list my property
+            </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.optionButton, userType === 'searcher' && styles.optionButtonSelected]}
+            onPress={() => setUserType('searcher')}
+          >
+            <Ionicons name="search" size={32} color={userType === 'searcher' ? '#FFF5E1' : '#6F4E37'} />
+            <Text style={[styles.optionText, userType === 'searcher' && styles.optionTextSelected]}>
+              I'm Looking
+            </Text>
+            <Text style={[styles.optionSubtext, userType === 'searcher' && styles.optionSubtextSelected]}>
+              I want to find housing or roommates
+            </Text>
+          </TouchableOpacity>
+
+          {userType === 'searcher' && (
+            <View style={styles.lookingForContainer}>
+              <Text style={styles.lookingForTitle}>What are you looking for?</Text>
+              <TouchableOpacity
+                style={[styles.lookingForButton, lookingFor === 'roommates' && styles.lookingForButtonSelected]}
+                onPress={() => setLookingFor('roommates')}
+              >
+                <Text style={[styles.lookingForText, lookingFor === 'roommates' && styles.lookingForTextSelected]}>
+                  Roommates
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.lookingForButton, lookingFor === 'housing' && styles.lookingForButtonSelected]}
+                onPress={() => setLookingFor('housing')}
+              >
+                <Text style={[styles.lookingForText, lookingFor === 'housing' && styles.lookingForTextSelected]}>
+                  Housing
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.lookingForButton, lookingFor === 'both' && styles.lookingForButtonSelected]}
+                onPress={() => setLookingFor('both')}
+              >
+                <Text style={[styles.lookingForText, lookingFor === 'both' && styles.lookingForTextSelected]}>
+                  Both
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-      </View>
-    );
+      );
+    } else if (step === 1) {
+      // Email verification
+      return (
+        <View style={styles.stepContainer}>
+          {!codeSent ? (
+            <>
+              <Text style={styles.title}>Verify your email</Text>
+              <Text style={styles.subtitle}>We'll send you a 6-digit code</Text>
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor="#A68B7B"
+                value={formData.email}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, email: text });
+                  setEmailVerified(false);
+                  setCodeSent(false);
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!emailVerified}
+              />
+
+              <TouchableOpacity
+                style={[styles.verifyButton, isVerifyingCode && styles.verifyButtonDisabled]}
+                onPress={handleRequestCode}
+                disabled={isVerifyingCode}
+              >
+                <Text style={styles.verifyButtonText}>
+                  {isVerifyingCode ? 'Sending code...' : 'Send Code'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : !emailVerified ? (
+            <>
+              <View style={styles.codeSentContainer}>
+                <View style={styles.codeSentIconContainer}>
+                  <Ionicons name="mail" size={64} color="#FF6B35" />
+                </View>
+                <Text style={styles.codeSentTitle}>Check your email</Text>
+                <Text style={styles.codeSentText}>
+                  A one-time passcode has been sent to your email
+                </Text>
+                <Text style={styles.codeSentEmail}>{formData.email}</Text>
+                <Text style={styles.codeSentSubtext}>
+                  Enter the 6-digit code below to continue
+                </Text>
+              </View>
+
+              <View style={styles.codeInputContainer}>
+                <Text style={styles.codeLabel}>Enter 6-digit code</Text>
+                <TextInput
+                  style={styles.codeInput}
+                  placeholder="000000"
+                  placeholderTextColor="#A68B7B"
+                  value={code}
+                  onChangeText={(text) => {
+                    const digits = text.replace(/\D/g, '').slice(0, 6);
+                    setCode(digits);
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.verifyButton, (isVerifyingCode || code.length !== 6) && styles.verifyButtonDisabled]}
+                onPress={handleVerifyCode}
+                disabled={isVerifyingCode || code.length !== 6}
+              >
+                <Text style={styles.verifyButtonText}>
+                  {isVerifyingCode ? 'Verifying...' : 'Verify Code'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.resendButton}
+                onPress={() => {
+                  setCode('');
+                  handleRequestCode();
+                }}
+                disabled={isVerifyingCode}
+              >
+                <Text style={styles.resendButtonText}>Resend code</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.verifiedContainer}>
+              <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
+              <Text style={styles.verifiedText}>Email verified!</Text>
+            </View>
+          )}
+        </View>
+      );
+    } else if (step === 2) {
+      // Phone
+      const formatPhoneNumber = (text: string) => {
+        // Remove all non-digits
+        const digits = text.replace(/\D/g, '');
+        // Limit to 10 digits
+        const limited = digits.slice(0, 10);
+        // Format as XXX-XXX-XXXX
+        if (limited.length <= 3) {
+          return limited;
+        } else if (limited.length <= 6) {
+          return `${limited.slice(0, 3)}-${limited.slice(3)}`;
+        } else {
+          return `${limited.slice(0, 3)}-${limited.slice(3, 6)}-${limited.slice(6)}`;
+        }
+      };
+
+      return (
+        <View style={styles.stepContainer}>
+          <Text style={styles.title}>What's your phone number?</Text>
+          <Text style={styles.subtitle}>+1 (US only)</Text>
+            <TextInput
+              style={styles.input}
+            placeholder="XXX-XXX-XXXX"
+            placeholderTextColor="#A68B7B"
+            value={formData.phone}
+            onChangeText={(text) => {
+              const formatted = formatPhoneNumber(text);
+              setFormData({ ...formData, phone: formatted });
+            }}
+            keyboardType="phone-pad"
+            maxLength={12} // XXX-XXX-XXXX format
+          />
+        </View>
+      );
+    } else if (step === 3) {
+      // Name
+      return (
+        <View style={styles.stepContainer}>
+          <Text style={styles.title}>What's your name?</Text>
+            <TextInput
+              style={styles.input}
+            placeholder="Enter your name"
+            placeholderTextColor="#A68B7B"
+            value={formData.name}
+            onChangeText={(text) => setFormData({ ...formData, name: text })}
+            autoCapitalize="words"
+          />
+        </View>
+      );
+    } else if (step === 4) {
+      // Profile Picture
+      return (
+        <View style={styles.stepContainer}>
+          <Text style={styles.title}>Add a profile picture</Text>
+          <Text style={styles.subtitle}>This helps others get to know you</Text>
+          
+          <TouchableOpacity style={styles.imagePickerButton} onPress={handleImagePicker}>
+            {formData.profilePicture ? (
+              <Image source={{ uri: formData.profilePicture }} style={styles.profileImage} />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Ionicons name="camera" size={48} color="#A68B7B" />
+                <Text style={styles.imagePlaceholderText}>Tap to add photo</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <Text style={styles.optionalText}>Optional - You can add this later</Text>
+        </View>
+      );
+    }
   };
 
   return (
     <View style={styles.container}>
-      {renderProgressBar()}
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {(step === 0 || (step === 1 && userType === 'searcher' && !lookingFor)) ? renderSelectionScreen() : renderQuestionScreen()}
-      </ScrollView>
-
-      {/* Dropdown Modal */}
-      <Modal
-        visible={dropdownVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setDropdownVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setDropdownVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select an option</Text>
-              <TouchableOpacity onPress={() => setDropdownVisible(false)}>
-                <Ionicons name="close" size={24} color="#6F4E37" />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={dropdownOptions}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.dropdownOption}
-                  onPress={() => selectDropdownOption(item)}
-                >
-                  <Text style={styles.dropdownOptionText}>{item}</Text>
-                  {getFormValue(dropdownKey) === item && (
-                    <Ionicons name="checkmark" size={20} color="#FF6B35" />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          </View>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Back Button */}
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Ionicons name="arrow-back" size={24} color="#6F4E37" />
         </TouchableOpacity>
-      </Modal>
+
+        {/* Progress Indicator */}
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { width: `${((step + 1) / 5) * 100}%` }]} />
+        </View>
+
+        {/* Step Content */}
+        {renderStep()}
+
+        {/* Next Button */}
+        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+          <Text style={styles.nextButtonText}>
+            {step === 4 ? 'Complete' : 'Next'}
+          </Text>
+          <Ionicons name="arrow-forward" size={20} color="#FFF5E1" />
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
@@ -616,303 +615,268 @@ export default function SignUpScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF5E1', // Beige/Cream
-  },
-  progressContainer: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: '#E8D5C4', // Light beige
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#FF6B35', // Orange
-    borderRadius: 2,
+    backgroundColor: '#FFF5E1',
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 30,
-    paddingBottom: 40,
+    padding: 20,
   },
-  centerContent: {
-    alignItems: 'center',
+  backButton: {
+    marginTop: 20,
+    marginBottom: 20,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
-    width: '100%',
+    alignItems: 'center',
+  },
+  progressContainer: {
+    height: 4,
+    backgroundColor: '#E8D5C4',
+    borderRadius: 2,
+    marginBottom: 40,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#FF6B35',
+    borderRadius: 2,
+  },
+  stepContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
   title: {
     fontSize: 28,
-    fontWeight: '600',
-    color: '#6F4E37', // Espresso
+    fontWeight: '700',
+    color: '#6F4E37',
+    marginBottom: 12,
     textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#A68B7B',
     marginBottom: 40,
-    lineHeight: 36,
-  },
-  questionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#6F4E37', // Espresso
     textAlign: 'center',
-    marginBottom: 40,
-    lineHeight: 32,
-  },
-  buttonRow: {
-    width: '100%',
-    gap: 16,
-  },
-  buttonGrid: {
-    width: '100%',
-    gap: 16,
-  },
-  squareButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#FF6B35', // Orange
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 70,
-  },
-  squareButtonSelected: {
-    backgroundColor: '#FF6B35', // Orange
-    borderColor: '#FF6B35',
-  },
-  squareButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FF6B35', // Orange
-    textAlign: 'center',
-  },
-  squareButtonTextSelected: {
-    color: '#FFF5E1', // Beige
   },
   input: {
-    width: '100%',
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E8D5C4', // Light beige
     borderRadius: 12,
     padding: 16,
-    fontSize: 18,
-    color: '#6F4E37', // Espresso
-    marginBottom: 30,
+    fontSize: 16,
+    color: '#6F4E37',
+    borderWidth: 1,
+    borderColor: '#E8D5C4',
+    marginBottom: 20,
   },
-  imageUploadContainer: {
-    width: '100%',
-    marginBottom: 30,
-  },
-  imageUploadButton: {
-    width: '100%',
-  },
-  imageUploadPlaceholder: {
-    width: '100%',
-    height: 200,
+  optionButton: {
     backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 16,
+    alignItems: 'center',
     borderWidth: 2,
     borderColor: '#E8D5C4',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  imagePreviewContainer: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 2,
+  optionButtonSelected: {
+    backgroundColor: '#FF6B35',
     borderColor: '#FF6B35',
   },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  imageOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 12,
-    alignItems: 'center',
-  },
-  imageUploadText: {
-    marginTop: 4,
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
-  dropdownButton: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E8D5C4',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  dropdownButtonText: {
-    fontSize: 18,
-    color: '#6F4E37',
-  },
-  dropdownButtonTextPlaceholder: {
-    color: '#A68B7B',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFF5E1',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8D5C4',
-  },
-  modalTitle: {
+  optionText: {
     fontSize: 20,
     fontWeight: '600',
     color: '#6F4E37',
+    marginTop: 12,
   },
-  dropdownOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8D5C4',
+  optionTextSelected: {
+    color: '#FFF5E1',
   },
-  dropdownOptionText: {
-    fontSize: 18,
-    color: '#6F4E37',
-  },
-  mapPinContainer: {
-    width: '100%',
-    marginBottom: 30,
-    alignItems: 'center',
-  },
-  mapPinText: {
-    fontSize: 16,
+  optionSubtext: {
+    fontSize: 14,
     color: '#A68B7B',
-    marginBottom: 16,
+    marginTop: 4,
+  },
+  optionSubtextSelected: {
+    color: '#FFF5E1',
+  },
+  lookingForContainer: {
+    marginTop: 20,
+    gap: 12,
+  },
+  lookingForTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6F4E37',
+    marginBottom: 8,
+  },
+  lookingForButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#E8D5C4',
+  },
+  lookingForButtonSelected: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  lookingForText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#6F4E37',
     textAlign: 'center',
   },
-  mapPinButton: {
-    backgroundColor: '#FF6B35',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+  lookingForTextSelected: {
+    color: '#FFF5E1',
   },
-  mapPinButtonText: {
+  imagePickerButton: {
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  profileImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 4,
+    borderColor: '#FF6B35',
+  },
+  imagePlaceholder: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: '#E8D5C4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: '#A68B7B',
+    borderStyle: 'dashed',
+  },
+  imagePlaceholderText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#A68B7B',
+  },
+  optionalText: {
+    fontSize: 14,
+    color: '#A68B7B',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  nextButton: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    marginBottom: 40,
+  },
+  nextButtonText: {
+    color: '#FFF5E1',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  verifyButton: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  verifyButtonDisabled: {
+    opacity: 0.6,
+  },
+  verifyButtonText: {
     color: '#FFF5E1',
     fontSize: 16,
     fontWeight: '600',
   },
-  navigationButtons: {
-    flexDirection: 'row',
-    width: '100%',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    gap: 16,
+  codeInputContainer: {
+    marginTop: 24,
+    marginBottom: 12,
   },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    minWidth: 100,
-  },
-  backButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E8D5C4',
-  },
-  nextButton: {
-    backgroundColor: '#FF6B35', // Orange
-    flex: 1,
-  },
-  navButtonDisabled: {
-    opacity: 0.5,
-  },
-  navButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginHorizontal: 8,
-  },
-  backButtonText: {
-    color: '#6F4E37', // Espresso
-  },
-  nextButtonText: {
-    color: '#FFF5E1', // Beige
-  },
-  navButtonTextDisabled: {
-    color: '#D3D3D3',
-  },
-  buttonSelectionContainer: {
-    width: '100%',
-    gap: 12,
-    marginBottom: 30,
-  },
-  selectionButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#FF6B35', // Orange
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectionButtonSelected: {
-    backgroundColor: '#FF6B35', // Orange
-    borderColor: '#FF6B35',
-  },
-  selectionButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FF6B35', // Orange
-  },
-  selectionButtonTextSelected: {
-    color: '#FFF5E1', // Beige
-  },
-  bioContainer: {
-    width: '100%',
-    marginBottom: 30,
-  },
-  bioInput: {
-    minHeight: 120,
-    paddingTop: 16,
-  },
-  wordCount: {
-    marginTop: 8,
+  codeLabel: {
     fontSize: 14,
     color: '#6F4E37',
-    textAlign: 'right',
+    marginBottom: 8,
+    fontWeight: '500',
   },
-  wordCountError: {
+  codeInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E8D5C4',
+    padding: 20,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#6F4E37',
+    textAlign: 'center',
+    letterSpacing: 6,
+    minHeight: 70,
+  },
+  codeSentContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingVertical: 20,
+  },
+  codeSentIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#FFE5D9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  codeSentTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#6F4E37',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  codeSentText: {
+    fontSize: 16,
+    color: '#6F4E37',
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 24,
+  },
+  codeSentEmail: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF6B35',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  codeSentSubtext: {
+    fontSize: 14,
+    color: '#A68B7B',
+    textAlign: 'center',
+  },
+  resendButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  resendButtonText: {
+    fontSize: 14,
     color: '#FF6B35',
     fontWeight: '600',
+  },
+  verifiedContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+    padding: 24,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+  },
+  verifiedText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#4CAF50',
+    marginTop: 12,
   },
 });

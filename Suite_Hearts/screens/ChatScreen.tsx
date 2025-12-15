@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, FlatList, Image } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, FlatList, Image, TextInput, Alert, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,17 +10,59 @@ type ChatScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function ChatScreen() {
   const navigation = useNavigation<ChatScreenNavigationProp>();
-  const { currentUser, getConversationsForUser, getUserById } = useUser();
+  const { currentUser, getConversationsForUser, getUserById, deleteConversation, createGroupConversation, users, conversations } = useUser();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [selectedConversations, setSelectedConversations] = useState<Set<string>>(new Set());
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [selectedGroupMembers, setSelectedGroupMembers] = useState<Set<string>>(new Set());
 
-  if (!currentUser) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.noUserText}>Please sign up first</Text>
-      </View>
-    );
-  }
+  // All hooks must be called before any conditional returns
+  // Use conversations directly to ensure re-render when conversations change
+  const allConversations = currentUser ? getConversationsForUser(currentUser.id) : [];
+  
+  // Get all matched/contacted users for group creation
+  const availableContacts = useMemo(() => {
+    const contactIds = new Set<string>();
+    allConversations.forEach(conv => {
+      conv.participants.forEach(id => {
+        if (id !== currentUser.id) contactIds.add(id);
+      });
+    });
+    return Array.from(contactIds).map(id => getUserById(id)).filter(Boolean);
+  }, [allConversations, currentUser.id, getUserById]);
 
-  const conversations = getConversationsForUser(currentUser.id);
+  // Filter conversations based on search
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return allConversations;
+    
+    const query = searchQuery.toLowerCase();
+    return allConversations.filter(conv => {
+      // Search in participant names
+      const participantNames = conv.participants
+        .filter(id => id !== currentUser.id)
+        .map(id => getUserById(id)?.name || '')
+        .join(' ')
+        .toLowerCase();
+      
+      if (participantNames.includes(query)) return true;
+      
+      // Search in message texts
+      if (conv.messages && conv.messages.length > 0) {
+        const messageTexts = conv.messages
+          .map(msg => msg.text || '')
+          .join(' ')
+          .toLowerCase();
+        if (messageTexts.includes(query)) return true;
+      }
+      
+      // Search in last message
+      if (conv.lastMessage?.text?.toLowerCase().includes(query)) return true;
+      
+      return false;
+    });
+  }, [allConversations, searchQuery, currentUser, getUserById]);
 
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -32,7 +74,6 @@ export default function ChatScreen() {
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays === 0) {
-      // Today - show time
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
       return 'Yesterday';
@@ -43,11 +84,73 @@ export default function ChatScreen() {
     }
   };
 
-  const renderConversation = ({ item }: { item: any }) => {
-    const otherUserId = item.participants.find((id: string) => id !== currentUser.id);
-    const otherUser = getUserById(otherUserId);
+  const handleDeleteMode = () => {
+    setIsDeleteMode(!isDeleteMode);
+    setSelectedConversations(new Set());
+  };
+
+  const toggleConversationSelection = (conversationId: string) => {
+    const newSelected = new Set(selectedConversations);
+    if (newSelected.has(conversationId)) {
+      newSelected.delete(conversationId);
+    } else {
+      newSelected.add(conversationId);
+    }
+    setSelectedConversations(newSelected);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedConversations.size === 0) return;
     
-    if (!otherUser) return null;
+    Alert.alert(
+      'Delete Conversations',
+      `Are you sure you want to delete ${selectedConversations.size} conversation(s)?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            for (const convId of selectedConversations) {
+              await deleteConversation(convId);
+            }
+            setIsDeleteMode(false);
+            setSelectedConversations(new Set());
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCreateGroup = async () => {
+    if (selectedGroupMembers.size < 2) {
+      Alert.alert('Error', 'Please select at least 2 people for a group chat (max 6 total).');
+      return;
+    }
+    if (selectedGroupMembers.size > 5) {
+      Alert.alert('Error', 'Group chats can have a maximum of 6 people total.');
+      return;
+    }
+    if (!groupName.trim()) {
+      Alert.alert('Error', 'Please enter a group name.');
+      return;
+    }
+
+    if (!currentUser) return;
+    const participantIds = [currentUser.id, ...Array.from(selectedGroupMembers)];
+    await createGroupConversation(participantIds, groupName.trim());
+    setShowGroupModal(false);
+    setGroupName('');
+    setSelectedGroupMembers(new Set());
+  };
+
+  const renderConversation = ({ item }: { item: any }) => {
+    if (!currentUser) return null;
+    const otherUserIds = item.participants.filter((id: string) => id !== currentUser.id);
+    const otherUsers = otherUserIds.map((id: string) => getUserById(id)).filter(Boolean);
+    const isGroup = item.isGroup || otherUsers.length > 1;
+    const displayName = isGroup ? (item.groupName || `${otherUsers.length + 1} people`) : (otherUsers[0]?.name || 'Unknown');
+    const isSelected = selectedConversations.has(item.id);
 
     const hasMessages = item.lastMessage;
     const lastMessageText = hasMessages 
@@ -56,22 +159,50 @@ export default function ChatScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.conversationItem}
-        onPress={() => navigation.navigate('Conversation', { userId: otherUser.id, userName: otherUser.name })}
+        style={[styles.conversationItem, isSelected && styles.conversationItemSelected]}
+        onPress={() => {
+          if (isDeleteMode) {
+            toggleConversationSelection(item.id);
+          } else {
+            if (isGroup) {
+              // Navigate to group conversation
+              navigation.navigate('Conversation', { userId: item.id, userName: displayName });
+            } else {
+              navigation.navigate('Conversation', { userId: otherUsers[0]?.id || '', userName: displayName });
+            }
+          }
+        }}
+        onLongPress={() => {
+          if (!isDeleteMode) {
+            setIsDeleteMode(true);
+            toggleConversationSelection(item.id);
+          }
+        }}
         activeOpacity={0.7}
       >
+        {isDeleteMode && (
+          <View style={styles.checkboxContainer}>
+            <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+              {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+            </View>
+          </View>
+        )}
         <View style={styles.conversationContent}>
-          {/* Profile Photo */}
+          {/* Profile Photo(s) */}
           <View style={styles.avatarContainer}>
-            {otherUser.profilePicture ? (
+            {isGroup ? (
+              <View style={styles.groupAvatar}>
+                <Ionicons name="people" size={24} color="#FFFFFF" />
+              </View>
+            ) : otherUsers[0]?.profilePicture ? (
               <Image 
-                source={{ uri: otherUser.profilePicture }} 
+                source={{ uri: otherUsers[0].profilePicture }} 
                 style={styles.avatarImage}
                 resizeMode="cover"
               />
             ) : (
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{otherUser.name[0].toUpperCase()}</Text>
+                <Text style={styles.avatarText}>{displayName[0]?.toUpperCase() || '?'}</Text>
               </View>
             )}
           </View>
@@ -80,7 +211,7 @@ export default function ChatScreen() {
           <View style={styles.conversationInfo}>
             <View style={styles.conversationHeader}>
               <Text style={styles.conversationName} numberOfLines={1}>
-                {otherUser.name}
+                {displayName}
               </Text>
               {hasMessages && (
                 <Text style={styles.timestamp}>
@@ -99,7 +230,7 @@ export default function ChatScreen() {
             )}
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />
+        {!isDeleteMode && <Ionicons name="chevron-forward" size={16} color="#C7C7CC" />}
       </TouchableOpacity>
     );
   };
@@ -110,38 +241,149 @@ export default function ChatScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="ellipsis-horizontal-circle" size={24} color="#6F4E37" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="create-outline" size={24} color="#6F4E37" />
-          </TouchableOpacity>
+          {isDeleteMode ? (
+            <>
+              <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMode}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.headerButton} 
+                onPress={handleDeleteSelected}
+                disabled={selectedConversations.size === 0}
+              >
+                <Ionicons 
+                  name="trash" 
+                  size={24} 
+                  color={selectedConversations.size > 0 ? '#FF3B30' : '#C7C7CC'} 
+                />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMode}>
+                <Ionicons name="trash-outline" size={24} color="#6F4E37" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerButton} onPress={() => setShowGroupModal(true)}>
+                <Ionicons name="create-outline" size={24} color="#6F4E37" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
-        <Text style={styles.searchPlaceholder}>Search</Text>
-        <Ionicons name="mic" size={20} color="#A68B7B" style={styles.micIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search conversations, names, messages..."
+          placeholderTextColor="#8E8E93"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color="#A68B7B" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Conversations List */}
-      {conversations.length === 0 ? (
+      {filteredConversations.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubbles-outline" size={64} color="#E8D5C4" />
-          <Text style={styles.emptyText}>No conversations yet</Text>
-          <Text style={styles.emptySubtext}>Start chatting with other users!</Text>
+          <Text style={styles.emptyText}>
+            {searchQuery ? 'No conversations found' : 'No conversations yet'}
+          </Text>
+          <Text style={styles.emptySubtext}>
+            {searchQuery ? 'Try a different search term' : 'Start chatting with other users!'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={conversations}
+          data={filteredConversations}
           renderItem={renderConversation}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
+
+      {/* Group Chat Modal */}
+      <Modal visible={showGroupModal} transparent animationType="slide" onRequestClose={() => setShowGroupModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>New Group Chat</Text>
+              <TouchableOpacity onPress={() => setShowGroupModal(false)}>
+                <Ionicons name="close" size={24} color="#6F4E37" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalBody}>
+              <Text style={styles.modalLabel}>Group Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter group name"
+                value={groupName}
+                onChangeText={setGroupName}
+              />
+              
+              <Text style={styles.modalLabel}>Select Members ({selectedGroupMembers.size}/4)</Text>
+              <FlatList
+                data={availableContacts}
+                keyExtractor={(user) => user.id}
+                renderItem={({ item: user }) => {
+                  const isSelected = selectedGroupMembers.has(user.id);
+                  return (
+                    <TouchableOpacity
+                      style={styles.contactItem}
+                      onPress={() => {
+                        const newSelected = new Set(selectedGroupMembers);
+                        if (isSelected) {
+                          newSelected.delete(user.id);
+                        } else {
+                          if (newSelected.size < 4) {
+                            newSelected.add(user.id);
+                          } else {
+                            Alert.alert('Limit', 'Group chats can have a maximum of 6 people total (including you).');
+                          }
+                        }
+                        setSelectedGroupMembers(newSelected);
+                      }}
+                    >
+                      <View style={styles.contactAvatar}>
+                        {user.profilePicture ? (
+                          <Image source={{ uri: user.profilePicture }} style={styles.contactAvatarImage} />
+                        ) : (
+                          <Text style={styles.contactAvatarText}>{user.name[0]?.toUpperCase()}</Text>
+                        )}
+                      </View>
+                      <Text style={styles.contactName}>{user.name}</Text>
+                      <View style={[styles.contactCheckbox, isSelected && styles.contactCheckboxSelected]}>
+                        {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            </View>
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowGroupModal(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalCreateButton, (selectedGroupMembers.size < 2 || !groupName.trim()) && styles.modalCreateButtonDisabled]} 
+                onPress={handleCreateGroup}
+                disabled={selectedGroupMembers.size < 2 || !groupName.trim()}
+              >
+                <Text style={styles.modalCreateText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -149,21 +391,21 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // White background like iMessage
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 60,
+    paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: '#FFF5E1', // Cream header
+    backgroundColor: '#FFF5E1',
   },
   headerTitle: {
     fontSize: 34,
     fontWeight: '700',
-    color: '#000000', // Black title like iMessage
+    color: '#000000',
   },
   headerActions: {
     flexDirection: 'row',
@@ -172,10 +414,15 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 4,
   },
+  cancelText: {
+    fontSize: 16,
+    color: '#6F4E37',
+    fontWeight: '600',
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7', // Light gray search bar
+    backgroundColor: '#F2F2F7',
     marginHorizontal: 16,
     marginVertical: 8,
     paddingHorizontal: 12,
@@ -186,13 +433,11 @@ const styles = StyleSheet.create({
   searchIcon: {
     marginRight: 4,
   },
-  searchPlaceholder: {
+  searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#8E8E93',
-  },
-  micIcon: {
-    marginLeft: 4,
+    color: '#000000',
+    padding: 0,
   },
   listContent: {
     paddingBottom: 20,
@@ -204,6 +449,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
+  },
+  conversationItemSelected: {
+    backgroundColor: '#FFF5E1',
+  },
+  checkboxContainer: {
+    marginRight: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#C7C7CC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
   },
   conversationContent: {
     flexDirection: 'row',
@@ -217,7 +481,15 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#6F4E37', // Brown avatar background
+    backgroundColor: '#6F4E37',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  groupAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FF6B35',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -244,17 +516,17 @@ const styles = StyleSheet.create({
   conversationName: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000000', // Black name
+    color: '#000000',
     flex: 1,
   },
   timestamp: {
     fontSize: 15,
-    color: '#8E8E93', // Gray timestamp
+    color: '#8E8E93',
     marginLeft: 8,
   },
   lastMessage: {
     fontSize: 15,
-    color: '#8E8E93', // Gray message text
+    color: '#8E8E93',
     marginTop: 2,
   },
   startTalkingPrompt: {
@@ -266,7 +538,7 @@ const styles = StyleSheet.create({
   separator: {
     height: 0.5,
     backgroundColor: '#C6C6C8',
-    marginLeft: 84, // Align with message content (avatar + margin)
+    marginLeft: 84,
   },
   emptyContainer: {
     flex: 1,
@@ -292,5 +564,129 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 100,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFF5E1',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8D5C4',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#6F4E37',
+  },
+  modalBody: {
+    padding: 20,
+    maxHeight: 400,
+  },
+  modalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6F4E37',
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  modalInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#6F4E37',
+    borderWidth: 2,
+    borderColor: '#E8D5C4',
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  contactAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#6F4E37',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  contactAvatarText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  contactName: {
+    flex: 1,
+    fontSize: 16,
+    color: '#6F4E37',
+    fontWeight: '500',
+  },
+  contactCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#C7C7CC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  contactCheckboxSelected: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E8D5C4',
+  },
+  modalCancelButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E8D5C4',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6F4E37',
+  },
+  modalCreateButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#FF6B35',
+    alignItems: 'center',
+  },
+  modalCreateButtonDisabled: {
+    opacity: 0.5,
+  },
+  modalCreateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
 });
-

@@ -30,9 +30,14 @@ export default function IntroductionScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <Animated.Text style={[styles.welcomeText, { opacity: fadeAnim }]}>Welcome to Suite Hearts</Animated.Text>
-      <TouchableOpacity style={styles.signUpButton} onPress={() => navigation.navigate('SignUp')}>
-        <Text style={styles.signUpButtonText}>Sign Up</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.loginButton} onPress={() => navigation.navigate('Login')}>
+          <Text style={styles.loginButtonText}>Log In</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.signUpButton} onPress={() => navigation.navigate('SignUp')}>
+          <Text style={styles.signUpButtonText}>Sign Up</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -48,17 +53,37 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#6F4E37', // Espresso
-    marginBottom: 20,
+    marginBottom: 40,
+  },
+  buttonContainer: {
+    width: '100%',
+    paddingHorizontal: 40,
+    gap: 16,
+  },
+  loginButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FF6B35',
+  },
+  loginButtonText: {
+    color: '#FF6B35',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   signUpButton: {
-    backgroundColor: '#FF4500', // Blood Orange
-    paddingVertical: 10,
+    backgroundColor: '#FF6B35',
+    paddingVertical: 16,
     paddingHorizontal: 20,
-    borderRadius: 5,
+    borderRadius: 12,
   },
   signUpButtonText: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

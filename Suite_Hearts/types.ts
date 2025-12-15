@@ -1,10 +1,18 @@
 export type RootStackParamList = {
   Splash: undefined;
   Introduction: undefined;
-  SignUp: undefined;
+  Login: undefined;
+  SignUp: { email?: string } | undefined;
   Home: undefined;
   Chat: { userId: string; userName: string } | undefined;
   Conversation: { userId: string; userName: string };
+  ListingDetail: { listingId?: string; listing?: Listing | Property };
+};
+
+export type HomeStackParamList = {
+  PropertyList: undefined;
+  Map: undefined;
+  ListingDetail: { listingId?: string; listing?: Listing | Property };
 };
 
 export type UserType = 'homeowner' | 'searcher';
@@ -23,6 +31,8 @@ export interface User {
   university?: string; // Optional, only for searchers
   yearsExperience?: string; // Only for homeowners
   job: string;
+  jobRole?: string;
+  jobPlace?: string;
   profilePicture: string | null;
   hometown: string;
   location: string;
@@ -33,18 +43,29 @@ export interface User {
   nightOwl: string;
   religion: string;
   bio: string;
+  // New lifestyle preferences
+  friendliness?: number; // Scale 1-10: 1 = cordial co-habitants, 10 = best friends
+  cleanliness?: number; // Scale 1-10: 1 = messy, 10 = neat freak
+  guestsAllowed?: 'never' | 'with permission' | 'always okay';
   questions: string[];
+  prompts?: UserPrompt[]; // Up to 3 prompts
   // New housing preferences (only for searchers looking for housing)
-  maxRoommates?: number; // Up to how many people
+  maxRoommates?: number | string; // "None" or 1-6+
   roommateType?: 'roommates' | 'suitemates' | 'both'; // Roommates or suitemates or both
-  preferredCity?: string; // Palo Alto, SF, SJ, Berkeley
+  preferredCity?: string; // SF, Berkeley, Palo Alto, San Jose
   preferredLatitude?: number; // Optional pinned coordinates
   preferredLongitude?: number; // Optional pinned coordinates
-  spaceType?: 'Condo' | 'Townhome' | 'House' | 'Dorm'; // What kind of space
-  minBudget?: number; // Monthly budget min
+  spaceType?: string | string[]; // What kind of space (can be multiple)
+  minBudget?: number; // Monthly budget min (must be > 400)
   maxBudget?: number; // Monthly budget max
-  leaseDuration?: number; // 1-12 months
+  leaseDuration?: number | string; // "Under 1 month" to "12 months"
   createdAt: number;
+}
+
+export interface UserPrompt {
+  id: string;
+  promptText: string;
+  answer: string;
 }
 
 export interface Message {
@@ -58,7 +79,7 @@ export interface Message {
 
 export interface Conversation {
   id: string;
-  participants: string[]; // User IDs (up to 5 for group chats)
+  participants: string[]; // User IDs (up to 6 for group chats)
   messages: Message[];
   lastMessage?: Message;
   isGroup: boolean;

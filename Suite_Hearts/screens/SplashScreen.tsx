@@ -1,15 +1,42 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
+import { useUser } from '../context/UserContext';
+import { supabase } from '../lib/supabase';
 
 type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function SplashScreen() {
   const navigation = useNavigation<SplashScreenNavigationProp>();
+  const { currentUser, isLoaded, syncUserFromSupabase } = useUser();
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
+    // Check for existing Supabase session on startup
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user?.email) {
+          // User has an active session - sync their profile
+          await syncUserFromSupabase(session.user.id, session.user.email);
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setCheckingSession(false);
+      }
+    };
+
+    checkSession();
+  }, [syncUserFromSupabase]);
+
+  useEffect(() => {
+    // Wait for data to load and session check before navigating
+    if (!isLoaded || checkingSession) return;
+
     // GIF duration - adjust this based on your actual GIF length
     // You can check your GIF duration and update this value
     const GIF_DURATION = 3000; // 3 seconds - adjust to match your GIF's actual duration
@@ -19,11 +46,16 @@ export default function SplashScreen() {
     const totalDuration = GIF_DURATION + LAST_FRAME_DURATION;
     
     const timer = setTimeout(() => {
-      navigation.replace('Introduction');
+      // If user is logged in, go to Home, otherwise go to Introduction
+      if (currentUser) {
+        navigation.replace('Home');
+      } else {
+        navigation.replace('Introduction');
+      }
     }, totalDuration);
 
     return () => clearTimeout(timer);
-  }, [navigation]);
+  }, [navigation, currentUser, isLoaded, checkingSession]);
 
   return (
     <View style={styles.container}>
