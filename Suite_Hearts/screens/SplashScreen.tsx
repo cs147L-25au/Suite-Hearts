@@ -38,9 +38,8 @@ export default function SplashScreen() {
     if (!isLoaded || checkingSession) return;
 
     const GIF_DURATION = 3000; // 3 seconds 
-    const LAST_FRAME_DURATION = 1000; // 0.4 seconds on last frame
+    const LAST_FRAME_DURATION = 500; // 0.5 seconds on last frame
     
-    // After GIF finishes playing, wait 0.4 seconds on last frame, then navigate
     const totalDuration = GIF_DURATION + LAST_FRAME_DURATION;
     
     const timer = setTimeout(() => {

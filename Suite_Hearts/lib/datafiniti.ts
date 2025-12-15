@@ -474,17 +474,17 @@ export async function searchProperties(params: {
   }
 
   // Check for API key
-  // IMPORTANT: Add your API key to .env file in Suite_Hearts directory
+  // IMPORTANT: Add API key to .env file in Suite_Hearts directory
   // Format: EXPO_PUBLIC_DATAFINITI_API_KEY=your-actual-api-key-here
   const apiKey = process.env.EXPO_PUBLIC_DATAFINITI_API_KEY;
-  console.log('🔑 [Datafiniti] API Key Check:');
+  console.log(' [Datafiniti] API Key Check:');
   console.log('   - Key exists:', !!apiKey);
   console.log('   - Key length:', apiKey ? apiKey.length : 0);
   console.log('   - Key preview:', apiKey ? `${apiKey.substring(0, 10)}...` : 'N/A');
   
   if (!apiKey || apiKey === 'your-api-key-here' || apiKey.trim() === '') {
-      console.error('❌ [Datafiniti] Missing or invalid API key. Cannot fetch properties.');
-      console.error('📝 [Datafiniti] To use live API:');
+      console.error(' [Datafiniti] Missing or invalid API key. Cannot fetch properties.');
+      console.error(' [Datafiniti] To use live API:');
       console.error('   1. Create .env file in Suite_Hearts directory');
       console.error('   2. Add: EXPO_PUBLIC_DATAFINITI_API_KEY=your-key-here');
       console.error('   3. Restart Expo: npx expo start --clear');
@@ -493,7 +493,7 @@ export async function searchProperties(params: {
       return [];
   }
   
-  console.log('✅ [Datafiniti] API key found and validated');
+  console.log(' [Datafiniti] API key found and validated');
 
   // Build queries: 30 separate API calls (15 for SF, 5 each for Berkeley, Palo Alto, San Jose)
   // RENTAL-ONLY: We filter for rental properties in code (more reliable than query syntax)
@@ -612,23 +612,23 @@ export async function searchProperties(params: {
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
-        console.error(`❌ [Datafiniti] Failed to parse JSON response:`, parseError);
-        console.error(`📄 [Datafiniti] Response text (first 500 chars):`, responseText.substring(0, 500));
+        console.error(` [Datafiniti] Failed to parse JSON response:`, parseError);
+        console.error(` [Datafiniti] Response text (first 500 chars):`, responseText.substring(0, 500));
         throw new Error(`Invalid JSON response from Datafiniti API: ${parseError}`);
       }
 
-      console.log(`✅ [Datafiniti] Response parsed successfully`);
-      console.log(`📊 [Datafiniti] Records in response: ${data.records?.length || 0}`);
-      console.log(`📋 [Datafiniti] Total found (num_found): ${data.num_found || 'N/A'}`);
+      console.log(` [Datafiniti] Response parsed successfully`);
+      console.log(` [Datafiniti] Records in response: ${data.records?.length || 0}`);
+      console.log(` [Datafiniti] Total found (num_found): ${data.num_found || 'N/A'}`);
       
       if (!data.records) {
-        console.warn(`⚠️ [Datafiniti] No 'records' field in response`);
-        console.log(`📄 [Datafiniti] Response structure:`, Object.keys(data));
+        console.warn(` [Datafiniti] No 'records' field in response`);
+        console.log(` [Datafiniti] Response structure:`, Object.keys(data));
         return [];
       }
       
       if (data.records.length === 0) {
-        console.warn(`⚠️ [Datafiniti] No records returned for query: "${query}"`);
+        console.warn(` [Datafiniti] No records returned for query: "${query}"`);
         console.warn(`   This could mean:`);
         console.warn(`   1. No properties match this query`);
         console.warn(`   2. Query syntax is incorrect`);
@@ -636,15 +636,15 @@ export async function searchProperties(params: {
         return [];
       }
       
-      console.log(`📄 [Datafiniti] First record sample:`, JSON.stringify(data.records[0], null, 2));
+      console.log(` [Datafiniti] First record sample:`, JSON.stringify(data.records[0], null, 2));
 
       // Transform API response to Property format
-      console.log(`🔄 [Datafiniti] Transforming ${data.records.length} records...`);
+      console.log(` [Datafiniti] Transforming ${data.records.length} records...`);
       const transformed = (data.records || [])
         .map((record, index) => {
           const property = transformProperty(record);
           if (!property) {
-            console.warn(`⚠️ [Datafiniti] Record ${index} failed transformation`);
+            console.warn(` [Datafiniti] Record ${index} failed transformation`);
           }
           return property;
         })
@@ -660,45 +660,45 @@ export async function searchProperties(params: {
           city.toLowerCase().includes(cityLower)
         );
         if (!isBayArea) {
-          console.warn(`⚠️ [Datafiniti] Post-filter: Removed property from ${p.city} (not a Bay Area city)`);
+          console.warn(` [Datafiniti] Post-filter: Removed property from ${p.city} (not a Bay Area city)`);
         }
         return isBayArea;
       });
       
-      console.log(`✅ [Datafiniti] Successfully transformed ${bayAreaFiltered.length}/${data.records.length} records`);
+      console.log(` [Datafiniti] Successfully transformed ${bayAreaFiltered.length}/${data.records.length} records`);
       if (bayAreaFiltered.length < data.records.length) {
-        console.warn(`⚠️ [Datafiniti] ${data.records.length - bayAreaFiltered.length} records were filtered out (missing required fields or not Bay Area)`);
+        console.warn(` [Datafiniti] ${data.records.length - bayAreaFiltered.length} records were filtered out (missing required fields or not Bay Area)`);
       }
       
       if (bayAreaFiltered.length > 0) {
-        console.log(`📄 [Datafiniti] First transformed property:`, bayAreaFiltered[0]);
-        console.log(`📋 [Datafiniti] Property cities:`, [...new Set(bayAreaFiltered.map(p => p.city))]);
+        console.log(` [Datafiniti] First transformed property:`, bayAreaFiltered[0]);
+        console.log(` [Datafiniti] Property cities:`, [...new Set(bayAreaFiltered.map(p => p.city))]);
       }
       
-      console.log(`✅ [Datafiniti] ===== ${queryType} Fetch Complete =====\n`);
+      console.log(` [Datafiniti] ===== ${queryType} Fetch Complete =====\n`);
       return bayAreaFiltered;
     } catch (error) {
-      console.error(`❌ [Datafiniti] ===== Error in ${queryType} Fetch =====`);
-      console.error(`❌ [Datafiniti] Error type:`, error instanceof Error ? error.constructor.name : typeof error);
-      console.error(`❌ [Datafiniti] Error message:`, error instanceof Error ? error.message : String(error));
+      console.error(` [Datafiniti] ===== Error in ${queryType} Fetch =====`);
+      console.error(` [Datafiniti] Error type:`, error instanceof Error ? error.constructor.name : typeof error);
+      console.error(` [Datafiniti] Error message:`, error instanceof Error ? error.message : String(error));
       if (error instanceof Error && error.stack) {
-        console.error(`❌ [Datafiniti] Stack trace:`, error.stack);
+        console.error(` [Datafiniti] Stack trace:`, error.stack);
       }
-      console.error(`❌ [Datafiniti] ===== End Error =====\n`);
+      console.error(` [Datafiniti] ===== End Error =====\n`);
       throw error;
     }
   };
 
   try {
-    console.log(`\n🚀 [Datafiniti] ==========================================`);
-    console.log(`🚀 [Datafiniti] STARTING PROPERTY FETCH`);
-    console.log(`🚀 [Datafiniti] ==========================================`);
-    console.log(`📍 [Datafiniti] SF Query: "${sfQuery}" (15 calls)`);
-    console.log(`📍 [Datafiniti] Berkeley Query: "${berkeleyQuery}" (5 calls)`);
-    console.log(`📍 [Datafiniti] Palo Alto Query: "${paloAltoQuery}" (5 calls)`);
-    console.log(`📍 [Datafiniti] San Jose Query: "${sanJoseQuery}" (5 calls)`);
-    console.log(`🔑 [Datafiniti] USE_MOCK_DATA: ${USE_MOCK_DATA}`);
-    console.log(`🔑 [Datafiniti] API Key present: ${!!apiKey}`);
+    console.log(`\n [Datafiniti] ==========================================`);
+    console.log(` [Datafiniti] STARTING PROPERTY FETCH`);
+    console.log(` [Datafiniti] ==========================================`);
+    console.log(` [Datafiniti] SF Query: "${sfQuery}" (15 calls)`);
+    console.log(` [Datafiniti] Berkeley Query: "${berkeleyQuery}" (5 calls)`);
+    console.log(` [Datafiniti] Palo Alto Query: "${paloAltoQuery}" (5 calls)`);
+    console.log(` [Datafiniti] San Jose Query: "${sanJoseQuery}" (5 calls)`);
+    console.log(` [Datafiniti] USE_MOCK_DATA: ${USE_MOCK_DATA}`);
+    console.log(` [Datafiniti] API Key present: ${!!apiKey}`);
     
     // Fetch 30 separate API calls: 15 for SF, 5 each for Berkeley, Palo Alto, San Jose
     // Use Promise.allSettled to handle individual failures gracefully
@@ -729,10 +729,10 @@ export async function searchProperties(params: {
       const result = allResults[i];
       if (result.status === 'fulfilled') {
         sfProperties.push(result.value);
-        console.log(`✅ [Datafiniti] SF Call ${i + 1} succeeded: ${result.value.length} properties`);
+        console.log(` [Datafiniti] SF Call ${i + 1} succeeded: ${result.value.length} properties`);
       } else {
         sfProperties.push([]);
-        console.error(`❌ [Datafiniti] SF Call ${i + 1} failed:`, result.reason);
+        console.error(` [Datafiniti] SF Call ${i + 1} failed:`, result.reason);
       }
     }
     
@@ -741,10 +741,10 @@ export async function searchProperties(params: {
       const result = allResults[15 + i];
       if (result.status === 'fulfilled') {
         berkeleyProperties.push(result.value);
-        console.log(`✅ [Datafiniti] Berkeley Call ${i + 1} succeeded: ${result.value.length} properties`);
+        console.log(` [Datafiniti] Berkeley Call ${i + 1} succeeded: ${result.value.length} properties`);
       } else {
         berkeleyProperties.push([]);
-        console.error(`❌ [Datafiniti] Berkeley Call ${i + 1} failed:`, result.reason);
+        console.error(` [Datafiniti] Berkeley Call ${i + 1} failed:`, result.reason);
       }
     }
     
@@ -753,10 +753,10 @@ export async function searchProperties(params: {
       const result = allResults[20 + i];
       if (result.status === 'fulfilled') {
         paloAltoProperties.push(result.value);
-        console.log(`✅ [Datafiniti] Palo Alto Call ${i + 1} succeeded: ${result.value.length} properties`);
+        console.log(` [Datafiniti] Palo Alto Call ${i + 1} succeeded: ${result.value.length} properties`);
       } else {
         paloAltoProperties.push([]);
-        console.error(`❌ [Datafiniti] Palo Alto Call ${i + 1} failed:`, result.reason);
+        console.error(` [Datafiniti] Palo Alto Call ${i + 1} failed:`, result.reason);
       }
     }
     
@@ -765,10 +765,10 @@ export async function searchProperties(params: {
       const result = allResults[25 + i];
       if (result.status === 'fulfilled') {
         sanJoseProperties.push(result.value);
-        console.log(`✅ [Datafiniti] San Jose Call ${i + 1} succeeded: ${result.value.length} properties`);
+        console.log(` [Datafiniti] San Jose Call ${i + 1} succeeded: ${result.value.length} properties`);
       } else {
         sanJoseProperties.push([]);
-        console.error(`❌ [Datafiniti] San Jose Call ${i + 1} failed:`, result.reason);
+        console.error(` [Datafiniti] San Jose Call ${i + 1} failed:`, result.reason);
       }
     }
 
@@ -801,14 +801,14 @@ export async function searchProperties(params: {
       if (!allPropertiesMap.has(prop.id)) {
         allPropertiesMap.set(prop.id, prop);
       } else {
-        console.log(`⚠️ [Datafiniti] Duplicate property found (ID: ${prop.id}), keeping first occurrence`);
+        console.log(` [Datafiniti] Duplicate property found (ID: ${prop.id}), keeping first occurrence`);
       }
     });
     const allProperties = Array.from(allPropertiesMap.values());
 
-    console.log(`\n📊 [Datafiniti] ==========================================`);
-    console.log(`📊 [Datafiniti] FETCH SUMMARY`);
-    console.log(`📊 [Datafiniti] ==========================================`);
+    console.log(`\n [Datafiniti] ==========================================`);
+    console.log(` [Datafiniti] FETCH SUMMARY`);
+    console.log(` [Datafiniti] ==========================================`);
     sfProperties.forEach((props, i) => {
       console.log(`   SF Call ${i + 1}: ${props.length} properties`);
     });
@@ -828,7 +828,7 @@ export async function searchProperties(params: {
       console.log(`   Cities found: ${cities.join(', ')}`);
       console.log(`   Price range: $${Math.min(...allProperties.map(p => p.price))} - $${Math.max(...allProperties.map(p => p.price))}`);
     } else {
-      console.warn(`   ⚠️ NO PROPERTIES RETURNED`);
+      console.warn(`    NO PROPERTIES RETURNED`);
       console.warn(`   Possible reasons:`);
       console.warn(`   1. API key is invalid or expired`);
       console.warn(`   2. Query syntax is incorrect`);
@@ -857,15 +857,15 @@ export async function searchProperties(params: {
 
     return allProperties;
   } catch (error) {
-    console.error(`\n❌ [Datafiniti] ==========================================`);
-    console.error(`❌ [Datafiniti] CRITICAL ERROR IN PROPERTY FETCH`);
-    console.error(`❌ [Datafiniti] ==========================================`);
-    console.error(`❌ [Datafiniti] Error:`, error);
+    console.error(`\n [Datafiniti] ==========================================`);
+    console.error(` [Datafiniti] CRITICAL ERROR IN PROPERTY FETCH`);
+    console.error(` [Datafiniti] ==========================================`);
+    console.error(` [Datafiniti] Error:`, error);
     if (error instanceof Error) {
-      console.error(`❌ [Datafiniti] Message:`, error.message);
-      console.error(`❌ [Datafiniti] Stack:`, error.stack);
+      console.error(` [Datafiniti] Message:`, error.message);
+      console.error(` [Datafiniti] Stack:`, error.stack);
     }
-    console.error(`❌ [Datafiniti] ==========================================\n`);
+    console.error(` [Datafiniti] ==========================================\n`);
     throw error;
   }
 }
