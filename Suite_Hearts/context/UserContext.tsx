@@ -97,6 +97,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
 
       // Convert Supabase user to app User format
+      const localUser = users.find(u => u.id === userId) || currentUser || undefined;
+
       const syncedUser: User = {
         id: data.id,
         userType: data.user_type as 'homeowner' | 'searcher',
@@ -133,9 +135,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
         minBudget: data.min_budget ? Number(data.min_budget) : undefined,
         maxBudget: data.max_budget ? Number(data.max_budget) : undefined,
         leaseDuration: data.lease_duration || undefined,
-        friendliness: data.friendliness !== null && data.friendliness !== undefined ? Number(data.friendliness) : undefined,
-        cleanliness: data.cleanliness !== null && data.cleanliness !== undefined ? Number(data.cleanliness) : undefined,
-        guestsAllowed: data.guests_allowed ? (data.guests_allowed as 'never' | 'with permission' | 'always okay') : undefined,
+        friendliness: data.friendliness !== null && data.friendliness !== undefined
+          ? Number(data.friendliness)
+          : localUser?.friendliness,
+        cleanliness: data.cleanliness !== null && data.cleanliness !== undefined
+          ? Number(data.cleanliness)
+          : localUser?.cleanliness,
+        guestsAllowed: data.guests_allowed
+          ? (data.guests_allowed as 'never' | 'with permission' | 'always okay')
+          : localUser?.guestsAllowed,
         createdAt: new Date(data.created_at).getTime(),
       };
       
@@ -303,30 +311,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       const supabaseUpdates: any = {};
       
-      // Map User fields to Supabase column names
-      if ('friendliness' in updates) {
-        const value = updates.friendliness;
-        if (value !== null && value !== undefined && value !== '') {
-          supabaseUpdates.friendliness = Number(value);
-        } else {
-          supabaseUpdates.friendliness = null;
+      // Lifestyle fields (treat together with other lifestyle prefs)
+      const lifestyleFieldMap: Record<string, string> = {
+        friendliness: 'friendliness',
+        cleanliness: 'cleanliness',
+        guestsAllowed: 'guests_allowed',
+      };
+
+      Object.entries(lifestyleFieldMap).forEach(([field, column]) => {
+        if (field in updates) {
+          const value = (updates as any)[field];
+          if (field === 'friendliness' || field === 'cleanliness') {
+            supabaseUpdates[column] = value !== null && value !== undefined && value !== '' 
+              ? Number(value) 
+              : null;
+          } else {
+            supabaseUpdates[column] = value && value !== '' ? value : null;
+          }
+          console.log(`💾 Saving ${field} to Supabase:`, supabaseUpdates[column], 'from:', value);
         }
-        console.log('💾 Saving friendliness to Supabase:', supabaseUpdates.friendliness, 'from:', value);
-      }
-      if ('cleanliness' in updates) {
-        const value = updates.cleanliness;
-        if (value !== null && value !== undefined && value !== '') {
-          supabaseUpdates.cleanliness = Number(value);
-        } else {
-          supabaseUpdates.cleanliness = null;
-        }
-        console.log('💾 Saving cleanliness to Supabase:', supabaseUpdates.cleanliness, 'from:', value);
-      }
-      if ('guestsAllowed' in updates) {
-        const value = updates.guestsAllowed;
-        supabaseUpdates.guests_allowed = (value && value !== '') ? value : null;
-        console.log('💾 Saving guestsAllowed to Supabase:', supabaseUpdates.guests_allowed, 'from:', value);
-      }
+      });
       if ('minBudget' in updates) {
         supabaseUpdates.min_budget = updates.minBudget !== null && updates.minBudget !== undefined 
           ? Number(updates.minBudget) 

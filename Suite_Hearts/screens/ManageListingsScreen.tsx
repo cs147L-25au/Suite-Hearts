@@ -386,7 +386,8 @@ function AddListingForm({ onClose, onSave, editingListing, visible }: { onClose:
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        // Some Expo SDKs expose MediaTypeOptions; MediaType can be undefined on older versions
+        mediaTypes: (ImagePicker as any).MediaType?.Images || ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -535,20 +536,22 @@ function AddListingForm({ onClose, onSave, editingListing, visible }: { onClose:
           } else {
             // Local file, need to upload
             try {
-              // Read the file
+              // Read file into a blob (works in React Native + expo-image-picker)
               const response = await fetch(photoUri);
               const blob = await response.blob();
-              
+
               // Create file path: listing-photos/{owner_id}/{listing_id}/photo-{index}.jpg
-              const fileExt = photoUri.split('.').pop() || 'jpg';
-              const fileName = `photo-${index}.${fileExt}`;
+              const fileExtWithQuery = photoUri.split('.').pop() || 'jpg';
+              const fileExt = fileExtWithQuery.split('?')[0];
+              const fileName = `photo-${index}.${fileExt || 'jpg'}`;
               const filePath = `${currentUser.id}/${listingId}/${fileName}`;
+              const contentType = blob.type && blob.type !== '' ? blob.type : `image/${fileExt || 'jpeg'}`;
               
-              // Upload to Supabase Storage
-              const { data: uploadData, error: uploadError } = await supabase.storage
+              // Upload to Supabase Storage (upsert allows replacement)
+              const { error: uploadError } = await supabase.storage
                 .from('listing-photos')
                 .upload(filePath, blob, {
-                  contentType: blob.type || 'image/jpeg',
+                  contentType,
                   upsert: true,
                 });
               

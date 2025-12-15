@@ -161,6 +161,15 @@ export default function LoginScreen({ navigation }: Props) {
         minBudget: userData.min_budget ? Number(userData.min_budget) : undefined,
         maxBudget: userData.max_budget ? Number(userData.max_budget) : undefined,
         leaseDuration: userData.lease_duration || undefined,
+        friendliness: userData.friendliness !== null && userData.friendliness !== undefined
+          ? Number(userData.friendliness)
+          : undefined,
+        cleanliness: userData.cleanliness !== null && userData.cleanliness !== undefined
+          ? Number(userData.cleanliness)
+          : undefined,
+        guestsAllowed: userData.guests_allowed
+          ? (userData.guests_allowed as 'never' | 'with permission' | 'always okay')
+          : undefined,
         createdAt: new Date(userData.created_at).getTime(),
       };
 
@@ -188,6 +197,14 @@ export default function LoginScreen({ navigation }: Props) {
     await handleRequestCode();
   };
 
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Introduction');
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -198,7 +215,7 @@ export default function LoginScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         {/* Back Button */}
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={24} color="#6F4E37" />
         </TouchableOpacity>
 
