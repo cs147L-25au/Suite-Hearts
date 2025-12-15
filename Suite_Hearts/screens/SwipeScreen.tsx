@@ -1,20 +1,39 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated, PanResponder, Modal, ScrollView, Image, TextInput, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { Ionicons } from '@expo/vector-icons';
-import { useUser } from '../context/UserContext';
-import { useProperties } from '../context/PropertyContext';
-import { User, Listing } from '../types';
-import RoommateCard from '../components/RoommateCard';
-import ListingCard from '../components/ListingCard';
-import { getRecommendedRoommates, getRecommendedListings } from '../lib/recommendation';
-import { supabase } from '../lib/supabase';
-import { Property } from '../lib/datafiniti';
-import { getRandomRealEstatePhotos } from '../lib/photoUtils';
-import RoommatePromptModal from '../components/RoommatePromptModal';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Dimensions,
+  Animated,
+  PanResponder,
+  Modal,
+  ScrollView,
+  Image,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+} from "react-native";
+import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
+import { Ionicons } from "@expo/vector-icons";
+import { useUser } from "../context/UserContext";
+import { useProperties } from "../context/PropertyContext";
+import { User, Listing } from "../types";
+import RoommateCard from "../components/RoommateCard";
+import ListingCard from "../components/ListingCard";
+import {
+  getRecommendedRoommates,
+  getRecommendedListings,
+} from "../lib/recommendation";
+import { supabase } from "../lib/supabase";
+import { Property } from "../lib/datafiniti";
+import { getRandomRealEstatePhotos } from "../lib/photoUtils";
+import RoommatePromptModal from "../components/RoommatePromptModal";
 
 const Tab = createMaterialTopTabNavigator();
-const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function SwipeScreen() {
   const { currentUser, users, addLikedListing, getUserById } = useUser();
@@ -25,46 +44,78 @@ export default function SwipeScreen() {
 
   const isProfileComplete = (user: User): boolean => {
     // Required fields: personal info, bio, and lifestyle preferences (friendliness, cleanliness, guestsAllowed are REQUIRED)
-    const baseFields = ['age', 'race', 'gender', 'hometown', 'location', 'smoking', 'drinking', 'drugs', 'nightOwl', 'religion', 'bio', 'friendliness', 'cleanliness', 'guestsAllowed'];
-    
+    const baseFields = [
+      "age",
+      "race",
+      "gender",
+      "hometown",
+      "location",
+      "smoking",
+      "drinking",
+      "drugs",
+      "nightOwl",
+      "religion",
+      "bio",
+      "friendliness",
+      "cleanliness",
+      "guestsAllowed",
+    ];
+
     let requiredFields: string[] = [];
-    if (user.userType === 'homeowner') {
-      requiredFields = [...baseFields, 'yearsExperience'];
+    if (user.userType === "homeowner") {
+      requiredFields = [...baseFields, "yearsExperience"];
     } else {
       // All searchers need housing preferences (even if only looking for roommates)
-      const searcherFields = [...baseFields, 'university', 'pets', 'maxRoommates', 'roommateType', 'preferredCity', 'spaceType', 'leaseDuration'];
+      const searcherFields = [
+        ...baseFields,
+        "university",
+        "pets",
+        "maxRoommates",
+        "roommateType",
+        "preferredCity",
+        "spaceType",
+        "leaseDuration",
+      ];
       requiredFields = searcherFields;
       // Check budget separately
       if (!user.minBudget || !user.maxBudget) return false;
     }
 
-    return requiredFields.every(field => {
-      if (field === 'budget') {
+    return requiredFields.every((field) => {
+      if (field === "budget") {
         return user.minBudget && user.maxBudget;
       }
-      if (field === 'spaceType') {
+      if (field === "spaceType") {
         const value = (user as any)[field];
-        return Array.isArray(value) ? value.length > 0 : (value && value.toString().trim() !== '');
+        return Array.isArray(value)
+          ? value.length > 0
+          : value && value.toString().trim() !== "";
       }
-      if (field === 'maxRoommates') {
+      if (field === "maxRoommates") {
         const value = (user as any)[field];
-        return value !== null && value !== undefined && value !== '';
+        return value !== null && value !== undefined && value !== "";
       }
-      if (field === 'friendliness' || field === 'cleanliness') {
+      if (field === "friendliness" || field === "cleanliness") {
         // These are numbers 1-10 (REQUIRED)
         const value = (user as any)[field];
-        return value !== null && value !== undefined && value >= 1 && value <= 10;
+        return (
+          value !== null && value !== undefined && value >= 1 && value <= 10
+        );
       }
-      if (field === 'guestsAllowed') {
+      if (field === "guestsAllowed") {
         // This is required (REQUIRED)
         const value = (user as any)[field];
-        return value !== null && value !== undefined && value !== '';
+        return value !== null && value !== undefined && value !== "";
       }
       const value = (user as any)[field];
       if (value === null || value === undefined) return false;
       if (Array.isArray(value)) return value.length > 0;
       const stringValue = value.toString().trim();
-      return stringValue !== '' && stringValue !== 'null' && stringValue !== 'undefined';
+      return (
+        stringValue !== "" &&
+        stringValue !== "null" &&
+        stringValue !== "undefined"
+      );
     });
   };
 
@@ -72,69 +123,99 @@ export default function SwipeScreen() {
     if (!currentUser) return;
 
     // Filter users based on what current user is looking for
-    if (currentUser.userType === 'searcher') {
+    if (currentUser.userType === "searcher") {
       // Get potential roommates (other searchers looking for roommates)
       const potentialRoommates = users.filter(
         (user) =>
           user.id !== currentUser.id &&
-          user.userType === 'searcher' &&
-          (user.lookingFor === 'roommates' || user.lookingFor === 'both')
+          user.userType === "searcher" &&
+          (user.lookingFor === "roommates" || user.lookingFor === "both")
       );
 
-      console.log('=== ROOMMATE RECOMMENDATIONS DEBUG ===');
-      console.log('Current User:', {
+      console.log("=== ROOMMATE RECOMMENDATIONS DEBUG ===");
+      console.log("Current User:", {
         name: currentUser.name,
         id: currentUser.id,
         userType: currentUser.userType,
         lookingFor: currentUser.lookingFor,
         preferredCity: currentUser.preferredCity,
         location: currentUser.location,
-        profileComplete: isProfileComplete(currentUser)
+        profileComplete: isProfileComplete(currentUser),
       });
-      console.log('Total Users in Context:', users.length);
-      console.log('Users List (first 10):', users.slice(0, 10).map(u => ({ 
-        name: u.name, 
-        id: u.id,
-        userType: u.userType,
-        lookingFor: u.lookingFor,
-        city: u.preferredCity || u.location 
-      })));
-      console.log('All User IDs:', users.map(u => u.id));
-      console.log('Current User ID:', currentUser.id);
-      
-      console.log('Potential Roommates (before filtering):', potentialRoommates.length);
-      console.log('Potential Roommates Details:', potentialRoommates.map(u => ({ 
-        name: u.name, 
-        city: u.preferredCity || u.location,
-        profileComplete: isProfileComplete(u)
-      })));
+      console.log("Total Users in Context:", users.length);
+      console.log(
+        "Users List (first 10):",
+        users.slice(0, 10).map((u) => ({
+          name: u.name,
+          id: u.id,
+          userType: u.userType,
+          lookingFor: u.lookingFor,
+          city: u.preferredCity || u.location,
+        }))
+      );
+      console.log(
+        "All User IDs:",
+        users.map((u) => u.id)
+      );
+      console.log("Current User ID:", currentUser.id);
+
+      console.log(
+        "Potential Roommates (before filtering):",
+        potentialRoommates.length
+      );
+      console.log(
+        "Potential Roommates Details:",
+        potentialRoommates.map((u) => ({
+          name: u.name,
+          city: u.preferredCity || u.location,
+          profileComplete: isProfileComplete(u),
+        }))
+      );
 
       // Use recommendation algorithm to rank roommates
-      const recommendations = getRecommendedRoommates(currentUser, potentialRoommates, 0.3);
-      console.log('Recommendations (after algorithm):', recommendations.length);
-      console.log('Recommendations with scores:', recommendations.map(r => ({ 
-        name: (r.candidate as User).name, 
-        score: r.score,
-        city: (r.candidate as User).preferredCity || (r.candidate as User).location
-      })));
-      
-      const rankedRoommates = recommendations.map(rec => rec.candidate as User);
+      const recommendations = getRecommendedRoommates(
+        currentUser,
+        potentialRoommates,
+        0.3
+      );
+      console.log("Recommendations (after algorithm):", recommendations.length);
+      console.log(
+        "Recommendations with scores:",
+        recommendations.map((r) => ({
+          name: (r.candidate as User).name,
+          score: r.score,
+          city:
+            (r.candidate as User).preferredCity ||
+            (r.candidate as User).location,
+        }))
+      );
+
+      const rankedRoommates = recommendations.map(
+        (rec) => rec.candidate as User
+      );
       setRoommates(rankedRoommates);
-      console.log('Final Roommates Count:', rankedRoommates.length);
-      console.log('Roommates Set:', rankedRoommates.map(r => r.name));
-      console.log('=====================================');
+      console.log("Final Roommates Count:", rankedRoommates.length);
+      console.log(
+        "Roommates Set:",
+        rankedRoommates.map((r) => r.name)
+      );
+      console.log("=====================================");
 
       // Fetch listings from Supabase and Datafiniti
       const fetchListings = async () => {
         try {
           // Fetch user-created listings from Supabase
-          const { data: supabaseListings, error: supabaseError } = await supabase
-            .from('listings')
-            .select('*')
-            .order('created_at', { ascending: false });
+          const { data: supabaseListings, error: supabaseError } =
+            await supabase
+              .from("listings")
+              .select("*")
+              .order("created_at", { ascending: false });
 
           if (supabaseError) {
-            console.error('Error fetching listings from Supabase:', supabaseError);
+            console.error(
+              "Error fetching listings from Supabase:",
+              supabaseError
+            );
           }
 
           // Transform Supabase listings and fetch photos
@@ -142,20 +223,20 @@ export default function SwipeScreen() {
             (supabaseListings || []).map(async (item: any) => {
               // Fetch photos for this listing
               const { data: photosData } = await supabase
-                .from('listing_photos')
-                .select('photo_url')
-                .eq('listing_id', item.id)
-                .order('photo_order', { ascending: true });
+                .from("listing_photos")
+                .select("photo_url")
+                .eq("listing_id", item.id)
+                .order("photo_order", { ascending: true });
 
               return {
                 id: item.id,
                 ownerId: item.owner_id,
-                title: item.title || '',
-                description: item.description || '',
+                title: item.title || "",
+                description: item.description || "",
                 address: item.address,
                 city: item.city,
                 state: item.state,
-                zipCode: item.zip_code || '',
+                zipCode: item.zip_code || "",
                 price: item.price || 0,
                 latitude: item.latitude,
                 longitude: item.longitude,
@@ -171,68 +252,91 @@ export default function SwipeScreen() {
           );
 
           // Transform external properties to Listing format
-          const externalListings: Listing[] = datafinitiProperties.map((prop: Property) => ({
-            id: prop.id,
-            ownerId: '', // External listings don't have owners
-            title: `${prop.address}, ${prop.city}`,
-            description: prop.description || '', // Include description from external source
-            address: prop.address,
-            city: prop.city,
-            state: prop.state,
-            zipCode: '',
-            price: prop.price,
-            latitude: prop.latitude,
-            longitude: prop.longitude,
-            photos: [], // External listings get one photo assigned in ListingCard
-            bedrooms: prop.numBedrooms,
-            bathrooms: prop.numBathrooms,
-            squareFeet: undefined,
-            availableDate: undefined,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }));
+          const externalListings: Listing[] = datafinitiProperties.map(
+            (prop: Property) => ({
+              id: prop.id,
+              ownerId: "", // External listings don't have owners
+              title: `${prop.address}, ${prop.city}`,
+              description: prop.description || "", // Include description from external source
+              address: prop.address,
+              city: prop.city,
+              state: prop.state,
+              zipCode: "",
+              price: prop.price,
+              latitude: prop.latitude,
+              longitude: prop.longitude,
+              photos: [], // External listings get one photo assigned in ListingCard
+              bedrooms: prop.numBedrooms,
+              bathrooms: prop.numBathrooms,
+              squareFeet: undefined,
+              availableDate: undefined,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            })
+          );
 
           // Combine all listings (user-created and external only - no mock data)
           const allListings = [...userListings, ...externalListings];
 
-          console.log('=== LISTING RECOMMENDATIONS DEBUG ===');
-          console.log('Current User for Listings:', {
+          console.log("=== LISTING RECOMMENDATIONS DEBUG ===");
+          console.log("Current User for Listings:", {
             preferredCity: currentUser.preferredCity,
             location: currentUser.location,
             minBudget: currentUser.minBudget,
-            maxBudget: currentUser.maxBudget
+            maxBudget: currentUser.maxBudget,
           });
-          console.log('User Listings from Supabase:', userListings.length);
-          console.log('User Listings Details:', userListings.map(l => ({ 
-            address: l.address, 
-            city: l.city, 
-            price: l.price,
-            ownerId: l.ownerId
-          })));
-          console.log('External Listings:', externalListings.length);
-          console.log('External Listings Details:', externalListings.map(l => ({ 
-            address: l.address, 
-            city: l.city, 
-            price: l.price
-          })));
-          console.log('Total Listings (user-created + external only, no mock data):', allListings.length);
+          console.log("User Listings from Supabase:", userListings.length);
+          console.log(
+            "User Listings Details:",
+            userListings.map((l) => ({
+              address: l.address,
+              city: l.city,
+              price: l.price,
+              ownerId: l.ownerId,
+            }))
+          );
+          console.log("External Listings:", externalListings.length);
+          console.log(
+            "External Listings Details:",
+            externalListings.map((l) => ({
+              address: l.address,
+              city: l.city,
+              price: l.price,
+            }))
+          );
+          console.log(
+            "Total Listings (user-created + external only, no mock data):",
+            allListings.length
+          );
 
           // Use recommendation algorithm to rank listings
-          const listingRecommendations = getRecommendedListings(currentUser, allListings, 0.3);
-          console.log('Listing Recommendations (after algorithm):', listingRecommendations.length);
-          console.log('Listing Recommendations with scores:', listingRecommendations.map(r => ({ 
-            address: (r.candidate as Listing).address, 
-            city: (r.candidate as Listing).city,
-            price: (r.candidate as Listing).price,
-            score: r.score
-          })));
-          
-          const rankedListings = listingRecommendations.map(rec => rec.candidate as Listing);
+          const listingRecommendations = getRecommendedListings(
+            currentUser,
+            allListings,
+            0.3
+          );
+          console.log(
+            "Listing Recommendations (after algorithm):",
+            listingRecommendations.length
+          );
+          console.log(
+            "Listing Recommendations with scores:",
+            listingRecommendations.map((r) => ({
+              address: (r.candidate as Listing).address,
+              city: (r.candidate as Listing).city,
+              price: (r.candidate as Listing).price,
+              score: r.score,
+            }))
+          );
+
+          const rankedListings = listingRecommendations.map(
+            (rec) => rec.candidate as Listing
+          );
           setListings(rankedListings);
-          console.log('Final Listings Count:', rankedListings.length);
-          console.log('====================================');
+          console.log("Final Listings Count:", rankedListings.length);
+          console.log("====================================");
         } catch (error) {
-          console.error('Error fetching listings:', error);
+          console.error("Error fetching listings:", error);
           setListings([]);
         }
       };
@@ -251,15 +355,18 @@ export default function SwipeScreen() {
 
   // Check if profile is complete
   const profileComplete = isProfileComplete(currentUser);
-  
+
   if (!profileComplete) {
     return (
       <View style={styles.container}>
         <View style={styles.incompleteProfileContainer}>
           <Ionicons name="information-circle" size={64} color="#FF6B35" />
-          <Text style={styles.incompleteProfileTitle}>Complete Your Profile</Text>
+          <Text style={styles.incompleteProfileTitle}>
+            Complete Your Profile
+          </Text>
           <Text style={styles.incompleteProfileText}>
-            Please complete all required fields in your profile before you can start swiping.
+            Please complete all required fields in your profile before you can
+            start swiping.
           </Text>
           <Text style={styles.incompleteProfileSubtext}>
             Go to the Profile tab to add your information.
@@ -274,18 +381,26 @@ export default function SwipeScreen() {
   // - "roommates": only Roommates tab
   // - "housing": only Houses tab
   // - "both": both tabs
-  const showRoommatesTab = currentUser.userType === 'searcher' && 
-    (currentUser.lookingFor === 'roommates' || currentUser.lookingFor === 'both');
-  const showHousesTab = currentUser.userType === 'searcher' && 
-    (currentUser.lookingFor === 'housing' || currentUser.lookingFor === 'both');
-  const isRoommateOnly = currentUser.userType === 'searcher' && currentUser.lookingFor === 'roommates';
-  const isHousingOnly = currentUser.userType === 'searcher' && currentUser.lookingFor === 'housing';
+  const showRoommatesTab =
+    currentUser.userType === "searcher" &&
+    (currentUser.lookingFor === "roommates" ||
+      currentUser.lookingFor === "both");
+  const showHousesTab =
+    currentUser.userType === "searcher" &&
+    (currentUser.lookingFor === "housing" || currentUser.lookingFor === "both");
+  const isRoommateOnly =
+    currentUser.userType === "searcher" &&
+    currentUser.lookingFor === "roommates";
+  const isHousingOnly =
+    currentUser.userType === "searcher" && currentUser.lookingFor === "housing";
 
   // If user is a homeowner, they shouldn't see swipe screen
-  if (currentUser.userType === 'homeowner') {
+  if (currentUser.userType === "homeowner") {
     return (
       <View style={styles.container}>
-        <Text style={styles.noUserText}>Swipe feature is for searchers only</Text>
+        <Text style={styles.noUserText}>
+          Swipe feature is for searchers only
+        </Text>
       </View>
     );
   }
@@ -296,20 +411,22 @@ export default function SwipeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: 50 }]}>
       <Tab.Navigator
+        screenOptions={{ headerShown: false }}
         tabBar={(props) => (
           <View style={styles.customTabBar}>
             {props.state.routes.map((route, index) => {
               const { options } = props.descriptors[route.key];
-              const label = options.tabBarLabel !== undefined
-                ? options.tabBarLabel
-                : options.title !== undefined
-                ? options.title
-                : route.name;
+              const label =
+                options.tabBarLabel !== undefined
+                  ? options.tabBarLabel
+                  : options.title !== undefined
+                  ? options.title
+                  : route.name;
 
               const isFocused = props.state.index === index;
-              const isRoommatesTab = route.name === 'Roommates';
+              const isRoommatesTab = route.name === "Roommates";
               const isGreyedOut = isHousingOnly && isRoommatesTab;
 
               const onPress = () => {
@@ -317,9 +434,9 @@ export default function SwipeScreen() {
                   setShowRoommatePrompt(true);
                   return;
                 }
-                
+
                 const event = props.navigation.emit({
-                  type: 'tabPress',
+                  type: "tabPress",
                   target: route.key,
                   canPreventDefault: true,
                 });
@@ -349,7 +466,7 @@ export default function SwipeScreen() {
                       isGreyedOut && styles.customTabLabelGreyed,
                     ]}
                   >
-                    {typeof label === 'string' ? label : String(label)}
+                    {typeof label === "string" ? label : String(label)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -364,7 +481,9 @@ export default function SwipeScreen() {
         )}
         {showHousesTab && (
           <Tab.Screen name="Houses">
-            {() => <HousesTab listings={listings} isHousingOnly={isHousingOnly} />}
+            {() => (
+              <HousesTab listings={listings} isHousingOnly={isHousingOnly} />
+            )}
           </Tab.Screen>
         )}
       </Tab.Navigator>
@@ -379,17 +498,25 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
-  const [selectedPrompt, setSelectedPrompt] = useState<{ id: string; promptText: string; answer: string } | null>(null);
-  const [messageText, setMessageText] = useState('');
+  const [selectedPrompt, setSelectedPrompt] = useState<{
+    id: string;
+    promptText: string;
+    answer: string;
+  } | null>(null);
+  const [messageText, setMessageText] = useState("");
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const cardSwipeTriggerRef = useRef<((direction: 'left' | 'right') => void) | null>(null);
+  const cardSwipeTriggerRef = useRef<
+    ((direction: "left" | "right") => void) | null
+  >(null);
 
   if (roommates.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="people-outline" size={64} color="#E8D5C4" />
         <Text style={styles.emptyText}>No roommates found</Text>
-        <Text style={styles.emptySubtext}>Check back later for new matches!</Text>
+        <Text style={styles.emptySubtext}>
+          Check back later for new matches!
+        </Text>
       </View>
     );
   }
@@ -400,12 +527,14 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
       <View style={styles.emptyContainer}>
         <Ionicons name="checkmark-circle" size={64} color="#FF6B35" />
         <Text style={styles.emptyText}>You've seen everyone!</Text>
-        <Text style={styles.emptySubtext}>Check back later for new matches</Text>
+        <Text style={styles.emptySubtext}>
+          Check back later for new matches
+        </Text>
       </View>
     );
   }
 
-  const handleSwipe = (direction: 'left' | 'right') => {
+  const handleSwipe = (direction: "left" | "right") => {
     // Trigger card animation if available
     if (cardSwipeTriggerRef.current) {
       cardSwipeTriggerRef.current(direction);
@@ -419,7 +548,7 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
     }
   };
 
-  const onCardSwipeComplete = (direction: 'left' | 'right') => {
+  const onCardSwipeComplete = (direction: "left" | "right") => {
     // This is called after animation completes
     setSwipedUsers(new Set([...swipedUsers, currentRoommate.id]));
     setIsExpanded(false);
@@ -432,31 +561,37 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
     setShowMessageModal(true);
   };
 
-  const handlePromptPress = (prompt: { id: string; promptText: string; answer: string }) => {
+  const handlePromptPress = (prompt: {
+    id: string;
+    promptText: string;
+    answer: string;
+  }) => {
     setSelectedPrompt(prompt);
     setShowPromptModal(true);
   };
 
   const handleSendPromptResponse = async () => {
     if (!messageText.trim() || !currentUser || !selectedPrompt) return;
-    
+
     setIsSendingMessage(true);
     try {
       // Send message with prompt context
-      const messageWithPrompt = `${selectedPrompt.promptText}\n\n${selectedPrompt.answer}\n\n${messageText.trim()}`;
+      const messageWithPrompt = `${selectedPrompt.promptText}\n\n${
+        selectedPrompt.answer
+      }\n\n${messageText.trim()}`;
       await sendMessage(currentUser.id, currentRoommate.id, messageWithPrompt);
-      setMessageText('');
+      setMessageText("");
       setShowPromptModal(false);
       setSelectedPrompt(null);
       setIsExpanded(false);
-      
+
       // Auto-swipe right after sending message
       setTimeout(() => {
-        handleSwipe('right');
+        handleSwipe("right");
       }, 100);
     } catch (error) {
-      console.error('Error sending prompt response:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      console.error("Error sending prompt response:", error);
+      Alert.alert("Error", "Failed to send message. Please try again.");
     } finally {
       setIsSendingMessage(false);
     }
@@ -464,21 +599,21 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentUser) return;
-    
+
     setIsSendingMessage(true);
     try {
       await sendMessage(currentUser.id, currentRoommate.id, messageText.trim());
-      setMessageText('');
+      setMessageText("");
       setShowMessageModal(false);
       setIsExpanded(false);
-      
+
       // Auto-swipe right after sending message
       setTimeout(() => {
-        handleSwipe('right');
+        handleSwipe("right");
       }, 100);
     } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      console.error("Error sending message:", error);
+      Alert.alert("Error", "Failed to send message. Please try again.");
     } finally {
       setIsSendingMessage(false);
     }
@@ -488,8 +623,8 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
     <View style={styles.swipeContainer}>
       <RoommateCard
         user={currentRoommate}
-        onSwipeLeft={() => onCardSwipeComplete('left')}
-        onSwipeRight={() => onCardSwipeComplete('right')}
+        onSwipeLeft={() => onCardSwipeComplete("left")}
+        onSwipeRight={() => onCardSwipeComplete("right")}
         isExpanded={isExpanded}
         onExpand={() => setIsExpanded(true)}
         onSwipeTrigger={(triggerFn) => {
@@ -497,7 +632,7 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
         }}
         onPromptPress={handlePromptPress}
       />
-      
+
       {/* Expanded Profile Modal */}
       <Modal
         visible={isExpanded}
@@ -513,11 +648,18 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
           >
             <Ionicons name="arrow-back" size={24} color="#6F4E37" />
           </TouchableOpacity>
-          <ScrollView style={styles.expandedScrollView} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.expandedScrollView}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Photo */}
             <View style={styles.expandedPhotoContainer}>
               {currentRoommate.profilePicture ? (
-                <Image source={{ uri: currentRoommate.profilePicture }} style={styles.expandedPhoto} resizeMode="cover" />
+                <Image
+                  source={{ uri: currentRoommate.profilePicture }}
+                  style={styles.expandedPhoto}
+                  resizeMode="cover"
+                />
               ) : (
                 <View style={styles.expandedPhotoPlaceholder}>
                   <Ionicons name="person" size={120} color="#E8D5C4" />
@@ -535,17 +677,24 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
               <View style={styles.expandedDetails}>
                 <View style={styles.expandedDetailRow}>
                   <Ionicons name="briefcase" size={20} color="#6F4E37" />
-                  <Text style={styles.expandedDetailText}>{currentRoommate.job}</Text>
+                  <Text style={styles.expandedDetailText}>
+                    {currentRoommate.job}
+                  </Text>
                 </View>
-                {currentRoommate.university && currentRoommate.university !== 'N/A' && (
-                  <View style={styles.expandedDetailRow}>
-                    <Ionicons name="school" size={20} color="#6F4E37" />
-                    <Text style={styles.expandedDetailText}>{currentRoommate.university}</Text>
-                  </View>
-                )}
+                {currentRoommate.university &&
+                  currentRoommate.university !== "N/A" && (
+                    <View style={styles.expandedDetailRow}>
+                      <Ionicons name="school" size={20} color="#6F4E37" />
+                      <Text style={styles.expandedDetailText}>
+                        {currentRoommate.university}
+                      </Text>
+                    </View>
+                  )}
                 <View style={styles.expandedDetailRow}>
                   <Ionicons name="location" size={20} color="#6F4E37" />
-                  <Text style={styles.expandedDetailText}>{currentRoommate.location}</Text>
+                  <Text style={styles.expandedDetailText}>
+                    {currentRoommate.location}
+                  </Text>
                 </View>
               </View>
 
@@ -557,44 +706,59 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
               )}
 
               {/* Prompts Section */}
-              {currentRoommate.prompts && currentRoommate.prompts.length > 0 && (
-                <View style={styles.expandedPromptsSection}>
-                  <Text style={styles.expandedPromptsLabel}>Prompts</Text>
-                  {currentRoommate.prompts.map((prompt) => (
-                    <TouchableOpacity
-                      key={prompt.id}
-                      style={styles.expandedPromptCard}
-                      onPress={() => {
-                        setIsExpanded(false);
-                        handlePromptPress(prompt);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.expandedPromptQuestion}>{prompt.promptText}</Text>
-                      <Text style={styles.expandedPromptAnswer}>{prompt.answer}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              {currentRoommate.prompts &&
+                currentRoommate.prompts.length > 0 && (
+                  <View style={styles.expandedPromptsSection}>
+                    <Text style={styles.expandedPromptsLabel}>Prompts</Text>
+                    {currentRoommate.prompts.map((prompt) => (
+                      <TouchableOpacity
+                        key={prompt.id}
+                        style={styles.expandedPromptCard}
+                        onPress={() => {
+                          setIsExpanded(false);
+                          handlePromptPress(prompt);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.expandedPromptQuestion}>
+                          {prompt.promptText}
+                        </Text>
+                        <Text style={styles.expandedPromptAnswer}>
+                          {prompt.answer}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
               <View style={styles.expandedPreferences}>
                 <Text style={styles.expandedPreferencesLabel}>Preferences</Text>
                 <View style={styles.expandedPreferencesGrid}>
                   <View style={styles.expandedPreferenceItem}>
                     <Text style={styles.expandedPreferenceLabel}>Smoking</Text>
-                    <Text style={styles.expandedPreferenceValue}>{currentRoommate.smoking}</Text>
+                    <Text style={styles.expandedPreferenceValue}>
+                      {currentRoommate.smoking}
+                    </Text>
                   </View>
                   <View style={styles.expandedPreferenceItem}>
                     <Text style={styles.expandedPreferenceLabel}>Drinking</Text>
-                    <Text style={styles.expandedPreferenceValue}>{currentRoommate.drinking}</Text>
+                    <Text style={styles.expandedPreferenceValue}>
+                      {currentRoommate.drinking}
+                    </Text>
                   </View>
                   <View style={styles.expandedPreferenceItem}>
                     <Text style={styles.expandedPreferenceLabel}>Pets</Text>
-                    <Text style={styles.expandedPreferenceValue}>{currentRoommate.pets || 'N/A'}</Text>
+                    <Text style={styles.expandedPreferenceValue}>
+                      {currentRoommate.pets || "N/A"}
+                    </Text>
                   </View>
                   <View style={styles.expandedPreferenceItem}>
-                    <Text style={styles.expandedPreferenceLabel}>Sleep Schedule</Text>
-                    <Text style={styles.expandedPreferenceValue}>{currentRoommate.nightOwl}</Text>
+                    <Text style={styles.expandedPreferenceLabel}>
+                      Sleep Schedule
+                    </Text>
+                    <Text style={styles.expandedPreferenceValue}>
+                      {currentRoommate.nightOwl}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -602,14 +766,18 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
               {currentRoommate.religion && (
                 <View style={styles.expandedDetailRow}>
                   <Ionicons name="heart" size={20} color="#6F4E37" />
-                  <Text style={styles.expandedDetailText}>Religion: {currentRoommate.religion}</Text>
+                  <Text style={styles.expandedDetailText}>
+                    Religion: {currentRoommate.religion}
+                  </Text>
                 </View>
               )}
 
               {currentRoommate.hometown && (
                 <View style={styles.expandedDetailRow}>
                   <Ionicons name="home" size={20} color="#6F4E37" />
-                  <Text style={styles.expandedDetailText}>From: {currentRoommate.hometown}</Text>
+                  <Text style={styles.expandedDetailText}>
+                    From: {currentRoommate.hometown}
+                  </Text>
                 </View>
               )}
             </View>
@@ -621,7 +789,7 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
       <View style={styles.floatingButtons}>
         <TouchableOpacity
           style={[styles.floatingButton, styles.dislikeButton]}
-          onPress={() => handleSwipe('left')}
+          onPress={() => handleSwipe("left")}
         >
           <Ionicons name="close" size={32} color="#FFFFFF" />
         </TouchableOpacity>
@@ -633,7 +801,7 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.floatingButton, styles.likeButton]}
-          onPress={() => handleSwipe('right')}
+          onPress={() => handleSwipe("right")}
         >
           <Ionicons name="heart" size={32} color="#FFFFFF" />
         </TouchableOpacity>
@@ -658,14 +826,16 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
               setSelectedPrompt(null);
             }}
           />
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.promptModalContent}
           >
             {/* User Name at Top */}
             <View style={styles.promptModalHeader}>
-              <Text style={styles.promptModalUserName}>{currentRoommate.name}</Text>
-              <TouchableOpacity 
+              <Text style={styles.promptModalUserName}>
+                {currentRoommate.name}
+              </Text>
+              <TouchableOpacity
                 onPress={() => {
                   setShowPromptModal(false);
                   setSelectedPrompt(null);
@@ -678,8 +848,12 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
             {/* Prompt Card */}
             {selectedPrompt && (
               <View style={styles.promptModalCard}>
-                <Text style={styles.promptModalQuestion}>{selectedPrompt.promptText}</Text>
-                <Text style={styles.promptModalAnswer}>{selectedPrompt.answer}</Text>
+                <Text style={styles.promptModalQuestion}>
+                  {selectedPrompt.promptText}
+                </Text>
+                <Text style={styles.promptModalAnswer}>
+                  {selectedPrompt.answer}
+                </Text>
               </View>
             )}
 
@@ -707,7 +881,7 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
                 onPress={() => {
                   setShowPromptModal(false);
                   setSelectedPrompt(null);
-                  setMessageText('');
+                  setMessageText("");
                 }}
               >
                 <Text style={styles.promptModalCancelText}>Cancel</Text>
@@ -725,7 +899,8 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
               <TouchableOpacity
                 style={[
                   styles.promptModalSendButton,
-                  (!messageText.trim() || isSendingMessage) && styles.promptModalSendButtonDisabled
+                  (!messageText.trim() || isSendingMessage) &&
+                    styles.promptModalSendButtonDisabled,
                 ]}
                 onPress={handleSendPromptResponse}
                 disabled={!messageText.trim() || isSendingMessage}
@@ -754,8 +929,8 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
             activeOpacity={1}
             onPress={() => setShowMessageModal(false)}
           />
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.messageModalKeyboardView}
           >
             <View style={styles.messageModalContent}>
@@ -778,7 +953,7 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
                     {currentRoommate.name}
                   </Text>
                 </View>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.messageModalCloseButton}
                   onPress={() => setShowMessageModal(false)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -803,7 +978,8 @@ function RoommatesTab({ roommates }: { roommates: User[] }) {
               <TouchableOpacity
                 style={[
                   styles.messageModalSendButton,
-                  (!messageText.trim() || isSendingMessage) && styles.messageModalSendButtonDisabled
+                  (!messageText.trim() || isSendingMessage) &&
+                    styles.messageModalSendButtonDisabled,
                 ]}
                 onPress={handleSendMessage}
                 disabled={!messageText.trim() || isSendingMessage}
@@ -830,11 +1006,14 @@ function HousingConversionPrompt() {
     if (!currentUser) return;
     setIsConverting(true);
     try {
-      await updateUser(currentUser.id, { lookingFor: 'both' });
-      Alert.alert('Success', 'You can now swipe on both roommates and housing!');
+      await updateUser(currentUser.id, { lookingFor: "both" });
+      Alert.alert(
+        "Success",
+        "You can now swipe on both roommates and housing!"
+      );
     } catch (error) {
-      console.error('Error converting profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      console.error("Error converting profile:", error);
+      Alert.alert("Error", "Failed to update profile. Please try again.");
     } finally {
       setIsConverting(false);
     }
@@ -843,9 +1022,12 @@ function HousingConversionPrompt() {
   return (
     <View style={styles.conversionContainer}>
       <Ionicons name="home-outline" size={80} color="#FF6B35" />
-      <Text style={styles.conversionTitle}>Want to start looking for housing?</Text>
+      <Text style={styles.conversionTitle}>
+        Want to start looking for housing?
+      </Text>
       <Text style={styles.conversionText}>
-        Unlock access to browse listings and use the map to find your perfect place!
+        Unlock access to browse listings and use the map to find your perfect
+        place!
       </Text>
       <TouchableOpacity
         style={styles.conversionButton}
@@ -869,7 +1051,13 @@ function HousingConversionPrompt() {
   );
 }
 
-function RoommateConversionPrompt({ onConvert, onDismiss }: { onConvert: () => void; onDismiss: () => void }) {
+function RoommateConversionPrompt({
+  onConvert,
+  onDismiss,
+}: {
+  onConvert: () => void;
+  onDismiss: () => void;
+}) {
   return (
     <Modal
       visible={true}
@@ -880,22 +1068,29 @@ function RoommateConversionPrompt({ onConvert, onDismiss }: { onConvert: () => v
       <View style={styles.conversionModalOverlay}>
         <View style={styles.conversionModalContent}>
           <Ionicons name="people-outline" size={64} color="#FF6B35" />
-          <Text style={styles.conversionModalTitle}>Want to start looking for roommates?</Text>
+          <Text style={styles.conversionModalTitle}>
+            Want to start looking for roommates?
+          </Text>
           <Text style={styles.conversionModalText}>
-            You've swiped through many listings! Start looking for roommates to find your perfect match.
+            You've swiped through many listings! Start looking for roommates to
+            find your perfect match.
           </Text>
           <View style={styles.conversionModalButtons}>
             <TouchableOpacity
               style={styles.conversionModalButton}
               onPress={onConvert}
             >
-              <Text style={styles.conversionModalButtonText}>Yes, let's do it!</Text>
+              <Text style={styles.conversionModalButtonText}>
+                Yes, let's do it!
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.conversionModalButtonSecondary}
               onPress={onDismiss}
             >
-              <Text style={styles.conversionModalButtonSecondaryText}>Not right now</Text>
+              <Text style={styles.conversionModalButtonSecondaryText}>
+                Not right now
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -904,25 +1099,42 @@ function RoommateConversionPrompt({ onConvert, onDismiss }: { onConvert: () => v
   );
 }
 
-function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; isHousingOnly?: boolean }) {
-  const { currentUser, sendMessage, users, updateUser, addLikedListing, getUserById } = useUser();
+function HousesTab({
+  listings,
+  isHousingOnly = false,
+}: {
+  listings: Listing[];
+  isHousingOnly?: boolean;
+}) {
+  const {
+    currentUser,
+    sendMessage,
+    users,
+    updateUser,
+    addLikedListing,
+    getUserById,
+  } = useUser();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [swipedListings, setSwipedListings] = useState<Set<string>>(new Set());
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
-  const [messageText, setMessageText] = useState('');
+  const [messageText, setMessageText] = useState("");
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [showRoommatePrompt, setShowRoommatePrompt] = useState(false);
   const [totalSwipes, setTotalSwipes] = useState(0);
   const [expandedPhotoIndex, setExpandedPhotoIndex] = useState(0);
-  const cardSwipeTriggerRef = useRef<((direction: 'left' | 'right') => void) | null>(null);
+  const cardSwipeTriggerRef = useRef<
+    ((direction: "left" | "right") => void) | null
+  >(null);
 
   if (listings.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="home-outline" size={64} color="#E8D5C4" />
         <Text style={styles.emptyText}>No listings found</Text>
-        <Text style={styles.emptySubtext}>Check back later for new properties!</Text>
+        <Text style={styles.emptySubtext}>
+          Check back later for new properties!
+        </Text>
       </View>
     );
   }
@@ -933,12 +1145,14 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
       <View style={styles.emptyContainer}>
         <Ionicons name="checkmark-circle" size={64} color="#FF6B35" />
         <Text style={styles.emptyText}>You've seen all listings!</Text>
-        <Text style={styles.emptySubtext}>Check back later for new properties</Text>
+        <Text style={styles.emptySubtext}>
+          Check back later for new properties
+        </Text>
       </View>
     );
   }
 
-  const handleSwipe = async (direction: 'left' | 'right') => {
+  const handleSwipe = async (direction: "left" | "right") => {
     // Trigger card animation if available
     if (cardSwipeTriggerRef.current) {
       cardSwipeTriggerRef.current(direction);
@@ -946,46 +1160,46 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
       // Fallback: just move to next
       setSwipedListings(new Set([...swipedListings, currentListing.id]));
       setIsExpanded(false);
-      if (direction === 'right') {
+      if (direction === "right") {
         await addLikedListing(currentListing.id);
       }
-      
+
       // Track swipes for housing-only users
       if (isHousingOnly) {
         const newTotalSwipes = totalSwipes + 1;
         setTotalSwipes(newTotalSwipes);
-        
+
         // Show prompt after 50 swipes or when all listings are swiped
         if (newTotalSwipes >= 50 || currentIndex >= listings.length - 1) {
           setShowRoommatePrompt(true);
         }
       }
-      
+
       if (currentIndex < listings.length - 1) {
         setCurrentIndex(currentIndex + 1);
       }
     }
   };
 
-  const onCardSwipeComplete = async (direction: 'left' | 'right') => {
+  const onCardSwipeComplete = async (direction: "left" | "right") => {
     // This is called after animation completes
     setSwipedListings(new Set([...swipedListings, currentListing.id]));
     setIsExpanded(false);
-    if (direction === 'right') {
+    if (direction === "right") {
       await addLikedListing(currentListing.id);
     }
-    
+
     // Track swipes for housing-only users
     if (isHousingOnly) {
       const newTotalSwipes = totalSwipes + 1;
       setTotalSwipes(newTotalSwipes);
-      
+
       // Show prompt after 50 swipes or when all listings are swiped
       if (newTotalSwipes >= 50 || currentIndex >= listings.length - 1) {
         setShowRoommatePrompt(true);
       }
     }
-    
+
     if (currentIndex < listings.length - 1) {
       setCurrentIndex(currentIndex + 1);
     }
@@ -994,41 +1208,50 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
   const handleConvertToBoth = async () => {
     if (!currentUser) return;
     try {
-      await updateUser(currentUser.id, { lookingFor: 'both' });
+      await updateUser(currentUser.id, { lookingFor: "both" });
       setShowRoommatePrompt(false);
-      Alert.alert('Success', 'You can now swipe on both roommates and housing!');
+      Alert.alert(
+        "Success",
+        "You can now swipe on both roommates and housing!"
+      );
     } catch (error) {
-      console.error('Error converting profile:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      console.error("Error converting profile:", error);
+      Alert.alert("Error", "Failed to update profile. Please try again.");
     }
   };
 
   // Check if listing has an owner (user-created listings can be messaged, external cannot)
-  const hasOwner = currentListing.ownerId && currentListing.ownerId !== '';
+  const hasOwner = currentListing.ownerId && currentListing.ownerId !== "";
 
   const handleChat = () => {
     // Check if this is an external listing (no ownerId)
     if (!hasOwner) {
       Alert.alert(
-        'External Listing',
-        'This listing is from an external source and cannot be messaged directly. You can still like it to save it for later!',
-        [{ text: 'OK' }]
+        "External Listing",
+        "This listing is from an external source and cannot be messaged directly. You can still like it to save it for later!",
+        [{ text: "OK" }]
       );
       return;
     }
-    
+
     // For user-created listings, find the owner
-    console.log('💬 [Chat] Looking for listing owner:', currentListing.ownerId);
-    let owner = users.find(u => u.id === currentListing.ownerId);
-    
+    console.log("💬 [Chat] Looking for listing owner:", currentListing.ownerId);
+    let owner = users.find((u) => u.id === currentListing.ownerId);
+
     if (!owner && currentListing.ownerId) {
       owner = getUserById(currentListing.ownerId);
     }
-    
-    console.log('💬 [Chat] Found owner:', owner ? { id: owner.id, name: owner.name } : 'NOT FOUND');
-    
+
+    console.log(
+      "💬 [Chat] Found owner:",
+      owner ? { id: owner.id, name: owner.name } : "NOT FOUND"
+    );
+
     if (!owner || !currentUser) {
-      Alert.alert('Error', `Unable to find listing owner. The owner may not be in the system.`);
+      Alert.alert(
+        "Error",
+        `Unable to find listing owner. The owner may not be in the system.`
+      );
       return;
     }
     setShowMessageModal(true);
@@ -1036,38 +1259,44 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentUser) return;
-    
-    console.log('💬 [Chat] Sending message for listing:', currentListing.id);
-    console.log('💬 [Chat] Owner ID:', currentListing.ownerId);
-    
+
+    console.log("💬 [Chat] Sending message for listing:", currentListing.id);
+    console.log("💬 [Chat] Owner ID:", currentListing.ownerId);
+
     // Try to get owner from users array or by ID
-    let owner = users.find(u => u.id === currentListing.ownerId);
+    let owner = users.find((u) => u.id === currentListing.ownerId);
     if (!owner && currentListing.ownerId) {
       owner = getUserById(currentListing.ownerId);
     }
-    
+
     if (!owner) {
-      console.error('💬 [Chat] Owner not found. Listing ownerId:', currentListing.ownerId);
-      Alert.alert('Error', `Unable to find listing owner (ID: ${currentListing.ownerId}). The owner may not be in the system.`);
+      console.error(
+        "💬 [Chat] Owner not found. Listing ownerId:",
+        currentListing.ownerId
+      );
+      Alert.alert(
+        "Error",
+        `Unable to find listing owner (ID: ${currentListing.ownerId}). The owner may not be in the system.`
+      );
       return;
     }
-    
-    console.log('💬 [Chat] Sending message to owner:', owner.name);
-    
+
+    console.log("💬 [Chat] Sending message to owner:", owner.name);
+
     setIsSendingMessage(true);
     try {
       await sendMessage(currentUser.id, owner.id, messageText.trim());
-      setMessageText('');
+      setMessageText("");
       setShowMessageModal(false);
       setIsExpanded(false);
-      
+
       // Auto-swipe right after sending message
       setTimeout(() => {
-        handleSwipe('right');
+        handleSwipe("right");
       }, 100);
     } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      console.error("Error sending message:", error);
+      Alert.alert("Error", "Failed to send message. Please try again.");
     } finally {
       setIsSendingMessage(false);
     }
@@ -1083,8 +1312,8 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
       )}
       <ListingCard
         listing={currentListing}
-        onSwipeLeft={() => onCardSwipeComplete('left')}
-        onSwipeRight={() => onCardSwipeComplete('right')}
+        onSwipeLeft={() => onCardSwipeComplete("left")}
+        onSwipeRight={() => onCardSwipeComplete("right")}
         isExpanded={isExpanded}
         onExpand={() => setIsExpanded(true)}
         onSwipeTrigger={(triggerFn) => {
@@ -1110,28 +1339,42 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
           >
             <Ionicons name="arrow-back" size={24} color="#6F4E37" />
           </TouchableOpacity>
-          <ScrollView style={styles.expandedScrollView} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.expandedScrollView}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Photo Gallery with Swipe Support */}
             <View style={styles.expandedPhotoContainer}>
               {(() => {
                 // Get photos: user-uploaded photos take priority, otherwise use random photos
-                const isExternalListing = !currentListing.ownerId || currentListing.ownerId === '';
+                const isExternalListing =
+                  !currentListing.ownerId || currentListing.ownerId === "";
                 const maxPhotos = isExternalListing ? 1 : 4;
-                const photos = currentListing.photos && currentListing.photos.length > 0 
-                  ? currentListing.photos.slice(0, maxPhotos)
-                  : getRandomRealEstatePhotos(currentListing.id, 1);
-                
+                const photos =
+                  currentListing.photos && currentListing.photos.length > 0
+                    ? currentListing.photos.slice(0, maxPhotos)
+                    : getRandomRealEstatePhotos(currentListing.id, 1);
+
                 const currentPhoto = photos[expandedPhotoIndex];
-                const photoUri = typeof currentPhoto === 'string' ? currentPhoto : 
-                  typeof currentPhoto === 'object' && currentPhoto.uri ? currentPhoto.uri :
-                  typeof currentPhoto === 'number' ? currentPhoto : null;
+                const photoUri =
+                  typeof currentPhoto === "string"
+                    ? currentPhoto
+                    : typeof currentPhoto === "object" && currentPhoto.uri
+                    ? currentPhoto.uri
+                    : typeof currentPhoto === "number"
+                    ? currentPhoto
+                    : null;
 
                 return (
                   <>
                     {photoUri ? (
                       <>
                         <Image
-                          source={typeof photoUri === 'string' ? { uri: photoUri } : photoUri}
+                          source={
+                            typeof photoUri === "string"
+                              ? { uri: photoUri }
+                              : photoUri
+                          }
                           style={styles.expandedPhoto}
                           resizeMode="cover"
                         />
@@ -1139,18 +1382,36 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                           <>
                             {expandedPhotoIndex > 0 && (
                               <TouchableOpacity
-                                style={[styles.expandedPhotoNavButton, styles.expandedPhotoNavButtonLeft]}
-                                onPress={() => setExpandedPhotoIndex(expandedPhotoIndex - 1)}
+                                style={[
+                                  styles.expandedPhotoNavButton,
+                                  styles.expandedPhotoNavButtonLeft,
+                                ]}
+                                onPress={() =>
+                                  setExpandedPhotoIndex(expandedPhotoIndex - 1)
+                                }
                               >
-                                <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+                                <Ionicons
+                                  name="chevron-back"
+                                  size={24}
+                                  color="#FFFFFF"
+                                />
                               </TouchableOpacity>
                             )}
                             {expandedPhotoIndex < photos.length - 1 && (
                               <TouchableOpacity
-                                style={[styles.expandedPhotoNavButton, styles.expandedPhotoNavButtonRight]}
-                                onPress={() => setExpandedPhotoIndex(expandedPhotoIndex + 1)}
+                                style={[
+                                  styles.expandedPhotoNavButton,
+                                  styles.expandedPhotoNavButtonRight,
+                                ]}
+                                onPress={() =>
+                                  setExpandedPhotoIndex(expandedPhotoIndex + 1)
+                                }
                               >
-                                <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+                                <Ionicons
+                                  name="chevron-forward"
+                                  size={24}
+                                  color="#FFFFFF"
+                                />
                               </TouchableOpacity>
                             )}
                             <View style={styles.expandedPhotoIndicators}>
@@ -1159,7 +1420,8 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                                   key={index}
                                   style={[
                                     styles.expandedPhotoIndicator,
-                                    index === expandedPhotoIndex && styles.expandedPhotoIndicatorActive,
+                                    index === expandedPhotoIndex &&
+                                      styles.expandedPhotoIndicatorActive,
                                   ]}
                                 />
                               ))}
@@ -1170,7 +1432,9 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                     ) : (
                       <View style={styles.expandedPhotoPlaceholder}>
                         <Ionicons name="home" size={64} color="#E8D5C4" />
-                        <Text style={styles.expandedPhotoPlaceholderText}>No photo available</Text>
+                        <Text style={styles.expandedPhotoPlaceholderText}>
+                          No photo available
+                        </Text>
                       </View>
                     )}
                   </>
@@ -1181,13 +1445,18 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
             {/* Info Section */}
             <View style={styles.expandedInfoContainer}>
               <View style={styles.expandedHeader}>
-                <Text style={styles.expandedPrice}>${currentListing.price.toLocaleString()}</Text>
+                <Text style={styles.expandedPrice}>
+                  ${currentListing.price.toLocaleString()}
+                </Text>
               </View>
 
               <View style={styles.expandedAddressSection}>
-                <Text style={styles.expandedAddress}>{currentListing.address}</Text>
+                <Text style={styles.expandedAddress}>
+                  {currentListing.address}
+                </Text>
                 <Text style={styles.expandedCityState}>
-                  {currentListing.city}, {currentListing.state} {currentListing.zipCode}
+                  {currentListing.city}, {currentListing.state}{" "}
+                  {currentListing.zipCode}
                 </Text>
               </View>
 
@@ -1195,16 +1464,22 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                 <View style={styles.expandedDetailsRow}>
                   <View style={styles.expandedDetailItem}>
                     <Ionicons name="bed" size={20} color="#6F4E37" />
-                    <Text style={styles.expandedDetailText}>{currentListing.bedrooms} bed</Text>
+                    <Text style={styles.expandedDetailText}>
+                      {currentListing.bedrooms} bed
+                    </Text>
                   </View>
                   <View style={styles.expandedDetailItem}>
                     <Ionicons name="water" size={20} color="#6F4E37" />
-                    <Text style={styles.expandedDetailText}>{currentListing.bathrooms} bath</Text>
+                    <Text style={styles.expandedDetailText}>
+                      {currentListing.bathrooms} bath
+                    </Text>
                   </View>
                   {currentListing.squareFeet && (
                     <View style={styles.expandedDetailItem}>
                       <Ionicons name="square" size={20} color="#6F4E37" />
-                      <Text style={styles.expandedDetailText}>{currentListing.squareFeet} sq ft</Text>
+                      <Text style={styles.expandedDetailText}>
+                        {currentListing.squareFeet} sq ft
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -1212,7 +1487,9 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
 
               {currentListing.description && (
                 <View style={styles.expandedDescriptionSection}>
-                  <Text style={styles.expandedDescriptionLabel}>About This Place</Text>
+                  <Text style={styles.expandedDescriptionLabel}>
+                    About This Place
+                  </Text>
                   <Text style={styles.expandedDescription}>
                     {currentListing.description}
                   </Text>
@@ -1223,7 +1500,10 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                 <View style={styles.expandedDetailRow}>
                   <Ionicons name="calendar" size={20} color="#6F4E37" />
                   <Text style={styles.expandedDetailText}>
-                    Available: {new Date(currentListing.availableDate).toLocaleDateString()}
+                    Available:{" "}
+                    {new Date(
+                      currentListing.availableDate
+                    ).toLocaleDateString()}
                   </Text>
                 </View>
               )}
@@ -1239,14 +1519,24 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                     }}
                   >
                     <Ionicons name="chatbubble" size={20} color="#FFFFFF" />
-                    <Text style={styles.expandedMessageButtonText}>Message Owner</Text>
+                    <Text style={styles.expandedMessageButtonText}>
+                      Message Owner
+                    </Text>
                   </TouchableOpacity>
                 ) : (
                   <View style={styles.expandedExternalListingNotice}>
-                    <Ionicons name="information-circle" size={24} color="#FF6B35" />
-                    <Text style={styles.expandedExternalListingTitle}>External Listing</Text>
+                    <Ionicons
+                      name="information-circle"
+                      size={24}
+                      color="#FF6B35"
+                    />
+                    <Text style={styles.expandedExternalListingTitle}>
+                      External Listing
+                    </Text>
                     <Text style={styles.expandedExternalListingText}>
-                      This listing is managed by an external agent. To contact them, please reach out through their website or contact information outside of this app.
+                      This listing is managed by an external agent. To contact
+                      them, please reach out through their website or contact
+                      information outside of this app.
                     </Text>
                   </View>
                 )}
@@ -1260,28 +1550,28 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
       <View style={styles.floatingButtons}>
         <TouchableOpacity
           style={[styles.floatingButton, styles.dislikeButton]}
-          onPress={() => handleSwipe('left')}
+          onPress={() => handleSwipe("left")}
         >
           <Ionicons name="close" size={32} color="#FFFFFF" />
         </TouchableOpacity>
         <TouchableOpacity
           style={[
-            styles.floatingButton, 
+            styles.floatingButton,
             styles.chatButton,
-            !hasOwner && styles.chatButtonDisabled
+            !hasOwner && styles.chatButtonDisabled,
           ]}
           onPress={handleChat}
           disabled={!hasOwner}
         >
-          <Ionicons 
-            name="chatbubble" 
-            size={24} 
-            color={hasOwner ? "#6F4E37" : "#E8D5C4"} 
+          <Ionicons
+            name="chatbubble"
+            size={24}
+            color={hasOwner ? "#6F4E37" : "#E8D5C4"}
           />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.floatingButton, styles.likeButton]}
-          onPress={() => handleSwipe('right')}
+          onPress={() => handleSwipe("right")}
         >
           <Ionicons name="heart" size={32} color="#FFFFFF" />
         </TouchableOpacity>
@@ -1301,8 +1591,8 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
               activeOpacity={1}
               onPress={() => setShowMessageModal(false)}
             />
-            <KeyboardAvoidingView 
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
               style={styles.messageModalKeyboardView}
             >
               <View style={styles.messageModalContent}>
@@ -1311,14 +1601,18 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                   <View style={styles.messageModalHeaderLeft}>
                     <View style={styles.messageModalAvatarContainer}>
                       {(() => {
-                        const owner = users.find(u => u.id === currentListing.ownerId) || getUserById(currentListing.ownerId);
+                        const owner =
+                          users.find((u) => u.id === currentListing.ownerId) ||
+                          getUserById(currentListing.ownerId);
                         return owner?.profilePicture ? (
                           <Image
                             source={{ uri: owner.profilePicture }}
                             style={styles.messageModalAvatarCircle}
                           />
                         ) : (
-                          <View style={styles.messageModalAvatarCirclePlaceholder}>
+                          <View
+                            style={styles.messageModalAvatarCirclePlaceholder}
+                          >
                             <Ionicons name="person" size={24} color="#E8D5C4" />
                           </View>
                         );
@@ -1326,12 +1620,14 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                     </View>
                     <Text style={styles.messageModalUserName} numberOfLines={1}>
                       {(() => {
-                        const owner = users.find(u => u.id === currentListing.ownerId) || getUserById(currentListing.ownerId);
-                        return owner?.name || 'Listing Owner';
+                        const owner =
+                          users.find((u) => u.id === currentListing.ownerId) ||
+                          getUserById(currentListing.ownerId);
+                        return owner?.name || "Listing Owner";
                       })()}
                     </Text>
                   </View>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.messageModalCloseButton}
                     onPress={() => setShowMessageModal(false)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -1356,7 +1652,8 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
                 <TouchableOpacity
                   style={[
                     styles.messageModalSendButton,
-                    (!messageText.trim() || isSendingMessage) && styles.messageModalSendButtonDisabled
+                    (!messageText.trim() || isSendingMessage) &&
+                      styles.messageModalSendButtonDisabled,
                   ]}
                   onPress={handleSendMessage}
                   disabled={!messageText.trim() || isSendingMessage}
@@ -1379,72 +1676,72 @@ function HousesTab({ listings, isHousingOnly = false }: { listings: Listing[]; i
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF5E1',
+    backgroundColor: "#FFF5E1",
   },
   swipeContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 40,
   },
   emptyText: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#A68B7B',
-    textAlign: 'center',
+    color: "#A68B7B",
+    textAlign: "center",
   },
   noUserText: {
     fontSize: 18,
-    color: '#6F4E37',
-    textAlign: 'center',
+    color: "#6F4E37",
+    textAlign: "center",
     marginTop: 100,
   },
   incompleteProfileContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 40,
   },
   incompleteProfileTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#6F4E37',
+    fontWeight: "700",
+    color: "#6F4E37",
     marginTop: 20,
     marginBottom: 12,
-    textAlign: 'center',
+    textAlign: "center",
   },
   incompleteProfileText: {
     fontSize: 16,
-    color: '#6F4E37',
-    textAlign: 'center',
+    color: "#6F4E37",
+    textAlign: "center",
     marginBottom: 8,
     lineHeight: 24,
   },
   incompleteProfileSubtext: {
     fontSize: 14,
-    color: '#A68B7B',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: "#A68B7B",
+    textAlign: "center",
+    fontStyle: "italic",
   },
   floatingButtons: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 40,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     gap: 20,
     paddingHorizontal: 20,
   },
@@ -1452,49 +1749,49 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
   dislikeButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: "#F44336",
   },
   chatButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderColor: '#E8D5C4',
+    borderColor: "#E8D5C4",
   },
   chatButtonDisabled: {
     opacity: 0.5,
-    borderColor: '#E8D5C4',
+    borderColor: "#E8D5C4",
   },
   likeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
   },
   cardTouchable: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   expandedContainer: {
     flex: 1,
-    backgroundColor: '#FFF5E1',
+    backgroundColor: "#FFF5E1",
   },
   expandedBackButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     left: 20,
     zIndex: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     width: 40,
     height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -1504,34 +1801,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   expandedPhotoContainer: {
-    width: '100%',
+    width: "100%",
     height: 400,
-    backgroundColor: '#E8D5C4',
-    position: 'relative',
-    overflow: 'hidden',
+    backgroundColor: "#E8D5C4",
+    position: "relative",
+    overflow: "hidden",
   },
   expandedPhotoGallery: {
-    width: '100%',
-    height: '100%',
-    flexDirection: 'row',
+    width: "100%",
+    height: "100%",
+    flexDirection: "row",
   },
   expandedPhoto: {
-    width: Dimensions.get('window').width,
-    height: '100%',
-    position: 'absolute',
+    width: Dimensions.get("window").width,
+    height: "100%",
+    position: "absolute",
     top: 0,
     left: 0,
   },
   expandedPhotoNavButton: {
-    position: 'absolute',
-    top: '50%',
+    position: "absolute",
+    top: "50%",
     transform: [{ translateY: -20 }],
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 20,
     width: 40,
     height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 10,
   },
   expandedPhotoNavButtonLeft: {
@@ -1541,12 +1838,12 @@ const styles = StyleSheet.create({
     right: 10,
   },
   expandedPhotoIndicators: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 12,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     gap: 6,
     zIndex: 10,
   },
@@ -1554,23 +1851,23 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
   },
   expandedPhotoIndicatorActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     width: 24,
   },
   expandedPhotoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E8D5C4',
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#E8D5C4",
   },
   expandedPhotoPlaceholderText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#A68B7B',
+    color: "#A68B7B",
   },
   expandedInfoContainer: {
     padding: 20,
@@ -1581,44 +1878,44 @@ const styles = StyleSheet.create({
   },
   expandedName: {
     fontSize: 36,
-    fontWeight: '700',
-    color: '#6F4E37',
+    fontWeight: "700",
+    color: "#6F4E37",
     marginRight: 12,
   },
   expandedAge: {
     fontSize: 28,
-    color: '#A68B7B',
+    color: "#A68B7B",
   },
   expandedPrice: {
     fontSize: 40,
-    fontWeight: '700',
-    color: '#6F4E37',
+    fontWeight: "700",
+    color: "#6F4E37",
   },
   expandedDetails: {
     marginBottom: 24,
   },
   expandedDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
     gap: 8,
   },
   expandedDetailText: {
     fontSize: 18,
-    color: '#6F4E37',
+    color: "#6F4E37",
   },
   expandedBioSection: {
     marginBottom: 24,
   },
   expandedBioLabel: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     marginBottom: 12,
   },
   expandedBio: {
     fontSize: 18,
-    color: '#6F4E37',
+    color: "#6F4E37",
     lineHeight: 28,
   },
   expandedPromptsSection: {
@@ -1626,27 +1923,27 @@ const styles = StyleSheet.create({
   },
   expandedPromptsLabel: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     marginBottom: 12,
   },
   expandedPromptCard: {
-    backgroundColor: '#FFF5E1',
+    backgroundColor: "#FFF5E1",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: '#FF6B35',
+    borderColor: "#FF6B35",
   },
   expandedPromptQuestion: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     marginBottom: 8,
   },
   expandedPromptAnswer: {
     fontSize: 16,
-    color: '#6F4E37',
+    color: "#6F4E37",
     lineHeight: 24,
   },
   expandedPreferences: {
@@ -1654,63 +1951,63 @@ const styles = StyleSheet.create({
   },
   expandedPreferencesLabel: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     marginBottom: 16,
   },
   expandedPreferencesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   expandedPreferenceItem: {
     flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#FFFFFF',
+    minWidth: "45%",
+    backgroundColor: "#FFFFFF",
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8D5C4',
+    borderColor: "#E8D5C4",
   },
   expandedPreferenceLabel: {
     fontSize: 14,
-    color: '#A68B7B',
+    color: "#A68B7B",
     marginBottom: 6,
   },
   expandedPreferenceValue: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
   },
   expandedAddressSection: {
     marginBottom: 20,
   },
   expandedAddress: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     marginBottom: 8,
   },
   expandedCityState: {
     fontSize: 20,
-    color: '#A68B7B',
+    color: "#A68B7B",
   },
   expandedDetailsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 16,
     marginBottom: 24,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
   expandedDetailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E8D5C4',
+    borderColor: "#E8D5C4",
   },
   expandedDescriptionSection: {
     marginBottom: 24,
@@ -1720,84 +2017,84 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingTop: 24,
     borderTopWidth: 1,
-    borderTopColor: '#E8D5C4',
+    borderTopColor: "#E8D5C4",
   },
   expandedMessageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FF6B35',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF6B35",
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,
     gap: 8,
   },
   expandedMessageButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   expandedExternalListingNotice: {
-    backgroundColor: '#FFF5E1',
+    backgroundColor: "#FFF5E1",
     borderWidth: 1,
-    borderColor: '#FF6B35',
+    borderColor: "#FF6B35",
     borderRadius: 12,
     padding: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   expandedExternalListingTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#6F4E37',
+    fontWeight: "700",
+    color: "#6F4E37",
     marginTop: 12,
     marginBottom: 8,
   },
   expandedExternalListingText: {
     fontSize: 14,
-    color: '#6F4E37',
-    textAlign: 'center',
+    color: "#6F4E37",
+    textAlign: "center",
     lineHeight: 20,
   },
   expandedDescriptionLabel: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     marginBottom: 12,
   },
   expandedDescription: {
     fontSize: 18,
-    color: '#6F4E37',
+    color: "#6F4E37",
     lineHeight: 28,
   },
   messageModalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 9999,
   },
   messageModalBackdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     zIndex: 9998,
   },
   messageModalKeyboardView: {
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
     zIndex: 10000,
   },
   messageModalContent: {
-    width: '90%',
+    width: "90%",
     maxWidth: 400,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -1805,14 +2102,14 @@ const styles = StyleSheet.create({
     zIndex: 10001,
   },
   messageModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
   messageModalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
     marginRight: 12,
   },
@@ -1824,160 +2121,160 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     borderWidth: 2,
-    borderColor: '#E8D5C4',
+    borderColor: "#E8D5C4",
   },
   messageModalAvatarCirclePlaceholder: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#E8D5C4',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#E8D5C4",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#E8D5C4',
+    borderColor: "#E8D5C4",
   },
   messageModalUserName: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#6F4E37',
+    fontWeight: "700",
+    color: "#6F4E37",
     flex: 1,
   },
   messageModalCloseButton: {
     padding: 5,
   },
   messageModalInputBox: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     minHeight: 100,
     maxHeight: 150,
     fontSize: 16,
-    color: '#6F4E37',
-    textAlignVertical: 'top',
+    color: "#6F4E37",
+    textAlignVertical: "top",
     marginBottom: 16,
   },
   messageModalSendButton: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: "#FF6B35",
     borderRadius: 12,
     paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   messageModalSendButtonDisabled: {
-    backgroundColor: '#E8D5C4',
+    backgroundColor: "#E8D5C4",
   },
   messageModalSendButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   conversionContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 40,
-    backgroundColor: '#FFF5E1',
+    backgroundColor: "#FFF5E1",
   },
   conversionTitle: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#6F4E37',
+    fontWeight: "700",
+    color: "#6F4E37",
     marginTop: 24,
     marginBottom: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   conversionText: {
     fontSize: 16,
-    color: '#A68B7B',
-    textAlign: 'center',
+    color: "#A68B7B",
+    textAlign: "center",
     marginBottom: 32,
     lineHeight: 24,
   },
   conversionButton: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: "#FF6B35",
     paddingVertical: 16,
     paddingHorizontal: 48,
     borderRadius: 30,
     marginBottom: 16,
     minWidth: 200,
-    alignItems: 'center',
+    alignItems: "center",
   },
   conversionButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   conversionButtonSecondary: {
     paddingVertical: 12,
     paddingHorizontal: 32,
   },
   conversionButtonSecondaryText: {
-    color: '#A68B7B',
+    color: "#A68B7B",
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   conversionModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   conversionModalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 32,
-    alignItems: 'center',
-    width: '100%',
+    alignItems: "center",
+    width: "100%",
     maxWidth: 400,
   },
   conversionModalTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#6F4E37',
+    fontWeight: "700",
+    color: "#6F4E37",
     marginTop: 20,
     marginBottom: 12,
-    textAlign: 'center',
+    textAlign: "center",
   },
   conversionModalText: {
     fontSize: 16,
-    color: '#A68B7B',
-    textAlign: 'center',
+    color: "#A68B7B",
+    textAlign: "center",
     marginBottom: 32,
     lineHeight: 24,
   },
   conversionModalButtons: {
-    width: '100%',
+    width: "100%",
     gap: 12,
   },
   conversionModalButton: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: "#FF6B35",
     paddingVertical: 16,
     borderRadius: 30,
-    alignItems: 'center',
+    alignItems: "center",
   },
   conversionModalButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   conversionModalButtonSecondary: {
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   conversionModalButtonSecondaryText: {
-    color: '#A68B7B',
+    color: "#A68B7B",
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   customTabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF5E1',
+    flexDirection: "row",
+    backgroundColor: "#FFF5E1",
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8D5C4',
+    borderBottomColor: "#E8D5C4",
   },
   customTabButton: {
     flex: 1,
@@ -1985,152 +2282,151 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
     marginHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
   },
   customTabButtonActive: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: "#FF6B35",
   },
   customTabButtonGreyed: {
     opacity: 0.5,
   },
   customTabLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#A68B7B',
+    fontWeight: "600",
+    color: "#A68B7B",
   },
   customTabLabelActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   customTabLabelGreyed: {
-    color: '#C7C7CC',
+    color: "#C7C7CC",
   },
   // Prompt Response Modal Styles (Hinge-style)
   promptModalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   promptModalBackdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   promptModalContent: {
-    width: '90%',
+    width: "90%",
     maxWidth: 400,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 12,
   },
   promptModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
   promptModalUserName: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#6F4E37',
+    fontWeight: "700",
+    color: "#6F4E37",
   },
   promptModalCard: {
-    backgroundColor: '#FFF5E1',
+    backgroundColor: "#FFF5E1",
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: '#FF6B35',
+    borderColor: "#FF6B35",
   },
   promptModalQuestion: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     marginBottom: 12,
   },
   promptModalAnswer: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#6F4E37',
+    fontWeight: "600",
+    color: "#6F4E37",
     lineHeight: 26,
   },
   promptModalCommentBubble: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
   },
   promptModalCommentText: {
     fontSize: 14,
-    color: '#A68B7B',
-    fontStyle: 'italic',
+    color: "#A68B7B",
+    fontStyle: "italic",
   },
   promptModalInput: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     minHeight: 80,
     maxHeight: 120,
     fontSize: 16,
-    color: '#6F4E37',
-    textAlignVertical: 'top',
+    color: "#6F4E37",
+    textAlignVertical: "top",
     marginBottom: 20,
   },
   promptModalActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   promptModalCancelButton: {
     flex: 1,
     paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   promptModalCancelText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#A68B7B',
+    fontWeight: "600",
+    color: "#A68B7B",
   },
   promptModalMessageButton: {
     flex: 1.5,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderColor: '#FF6B35',
+    borderColor: "#FF6B35",
     borderRadius: 12,
     paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   promptModalMessageText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FF6B35',
+    fontWeight: "600",
+    color: "#FF6B35",
   },
   promptModalSendButton: {
     flex: 1.5,
-    backgroundColor: '#FF6B35',
+    backgroundColor: "#FF6B35",
     borderRadius: 12,
     paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   promptModalSendButtonDisabled: {
-    backgroundColor: '#E8D5C4',
+    backgroundColor: "#E8D5C4",
   },
   promptModalSendText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
-
