@@ -39,3 +39,4 @@ yarn-error.*
 /ios
 /android
 .expo/
+.DS_Store

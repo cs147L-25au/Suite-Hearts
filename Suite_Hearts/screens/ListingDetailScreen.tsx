@@ -165,13 +165,21 @@ export default function ListingDetailScreen() {
   const beds = listingData.source === 'user' ? listingData.bedrooms : listingData.numBedrooms;
   const baths = listingData.source === 'user' ? listingData.bathrooms : listingData.numBathrooms;
 
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Home');
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Header with Back Button */}
       <View style={styles.topHeader}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={handleBack}
         >
           <Ionicons name="arrow-back" size={24} color="#6F4E37" />
         </TouchableOpacity>

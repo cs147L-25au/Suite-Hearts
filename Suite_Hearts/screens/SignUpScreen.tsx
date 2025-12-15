@@ -49,7 +49,7 @@ export default function SignUpScreen({ navigation, route }: Props) {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: (ImagePicker as any).MediaType?.Images || ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -171,8 +171,10 @@ export default function SignUpScreen({ navigation, route }: Props) {
   const handleBack = () => {
     if (step > 0) {
       setStep(step - 1);
-    } else {
+    } else if (navigation.canGoBack()) {
       navigation.goBack();
+    } else {
+      navigation.navigate('Introduction');
     }
   };
 
@@ -452,14 +454,14 @@ export default function SignUpScreen({ navigation, route }: Props) {
             <>
               <View style={styles.codeSentContainer}>
                 <View style={styles.codeSentIconContainer}>
-                  <Ionicons name="mail" size={64} color="#FF6B35" />
+                  <Ionicons name="mail" size={48} color="#FF6B35" />
                 </View>
                 <Text style={styles.codeSentTitle}>Check your email</Text>
                 <Text style={styles.codeSentText}>
                   A one-time passcode has been sent to your email
                 </Text>
                 <Text style={styles.codeSentEmail}>{formData.email}</Text>
-                <Text style={styles.codeSentSubtext}>
+                <Text style={[styles.codeSentSubtext, { marginBottom: 12 }]}>
                   Enter the 6-digit code below to continue
                 </Text>
               </View>
@@ -530,7 +532,7 @@ export default function SignUpScreen({ navigation, route }: Props) {
       return (
         <View style={styles.stepContainer}>
           <Text style={styles.title}>What's your phone number?</Text>
-          <Text style={styles.subtitle}>+1 (US only)</Text>
+          {/* Removed +1 caption to avoid country-specific hint */}
             <TextInput
               style={styles.input}
             placeholder="XXX-XXX-XXXX"

@@ -674,6 +674,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#000000',
     padding: 0,
+    letterSpacing: 0,
   },
   listContent: {
     paddingBottom: 20,

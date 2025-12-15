@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Image } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useProperties } from '../context/PropertyContext';
@@ -26,71 +26,69 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
   const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch ALL user-created listings (not just current user's)
-  useEffect(() => {
-    const fetchAllListings = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('listings')
-          .select('*')
-          .order('created_at', { ascending: false });
+  const fetchAllListings = React.useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*, listing_photos(photo_url, photo_order)')
+        .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching listings:', error);
-          return;
-        }
-
-        if (data) {
-          // Fetch photos for all listings
-          const listings: Listing[] = await Promise.all(
-            data.map(async (item: any) => {
-              // Fetch photos for this listing
-              const { data: photosData } = await supabase
-                .from('listing_photos')
-                .select('photo_url')
-                .eq('listing_id', item.id)
-                .order('photo_order', { ascending: true });
-
-              return {
-                id: item.id,
-                ownerId: item.owner_id,
-                title: item.title || '',
-                description: item.description || '',
-                address: item.address,
-                city: item.city,
-                state: item.state,
-                zipCode: item.zip_code || '',
-                price: item.price || 0,
-                latitude: item.latitude,
-                longitude: item.longitude,
-                photos: (photosData || []).map((p: any) => p.photo_url),
-                bedrooms: item.bedrooms,
-                bathrooms: item.bathrooms,
-                squareFeet: item.square_feet,
-                availableDate: item.available_date,
-                createdAt: new Date(item.created_at).getTime(),
-                updatedAt: new Date(item.updated_at).getTime(),
-              };
-            })
-          );
-          
-          // Separate my listings from others
-          if (currentUser) {
-            const myList = listings.filter(l => l.ownerId === currentUser.id);
-            const otherList = listings.filter(l => l.ownerId !== currentUser.id);
-            setMyListings(myList);
-            setAllUserListings(otherList);
-          } else {
-            setMyListings([]);
-            setAllUserListings(listings);
-          }
-        }
-      } catch (error) {
+      if (error) {
         console.error('Error fetching listings:', error);
+        return;
       }
-    };
 
-    fetchAllListings();
+      if (data) {
+        // Map listings with photos already joined
+        const listings: Listing[] = data.map((item: any) => ({
+          id: item.id,
+          ownerId: item.owner_id,
+          title: item.title || '',
+          description: item.description || '',
+          address: item.address,
+          city: item.city,
+          state: item.state,
+          zipCode: item.zip_code || '',
+          price: item.price || 0,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          photos: (item.listing_photos || [])
+            .sort((a: any, b: any) => (a.photo_order ?? 0) - (b.photo_order ?? 0))
+            .map((p: any) => p.photo_url),
+          bedrooms: item.bedrooms,
+          bathrooms: item.bathrooms,
+          squareFeet: item.square_feet,
+          availableDate: item.available_date,
+          createdAt: new Date(item.created_at).getTime(),
+          updatedAt: new Date(item.updated_at).getTime(),
+        }));
+        
+        // Separate my listings from others
+        if (currentUser) {
+          const myList = listings.filter(l => l.ownerId === currentUser.id);
+          const otherList = listings.filter(l => l.ownerId !== currentUser.id);
+          setMyListings(myList);
+          setAllUserListings(otherList);
+        } else {
+          setMyListings([]);
+          setAllUserListings(listings);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching listings:', error);
+    }
   }, [currentUser]);
+
+  useEffect(() => {
+    fetchAllListings();
+  }, [fetchAllListings]);
+
+  // Refresh listings whenever this tab gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAllListings();
+    }, [fetchAllListings])
+  );
 
   const handlePropertyPress = (property: Property) => {
     setSelectedPropertyId(property.id);
@@ -133,6 +131,9 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
 
   // Combine all listings: Supabase listings + external properties
   const allListings = [...myListings, ...allUserListings, ...externalListings];
+
+  // Combine user-created listings for shared rendering; mark current user's for styling
+  const combinedUserListings = [...myListings, ...allUserListings];
   
   // Filter listings by search query (address match)
   const filteredListings = searchQuery.trim() 
@@ -279,78 +280,19 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* My Listings Section */}
-        {myListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 && (
+        {/* All User-Created Listings Section (includes my listings styled in brown) */}
+        {combinedUserListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>My Listings</Text>
-            {myListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).map((listing) => {
+            <Text style={styles.sectionTitle}>All Listings</Text>
+            {combinedUserListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).map((listing) => {
+              const isMyListing = currentUser && listing.ownerId === currentUser.id;
               const photo = getListingPhoto(listing);
               return (
               <TouchableOpacity
                 key={listing.id}
                 style={[
                   styles.propertyCard,
-                  styles.myListingCard,
-                  selectedPropertyId === listing.id && styles.selectedCard,
-                ]}
-                onPress={() => handleListingPress(listing)}
-                activeOpacity={0.7}
-              >
-                {/* Property Image */}
-                <View style={styles.imageContainer}>
-                  {typeof photo === 'object' && 'uri' in photo ? (
-                    <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
-                  ) : typeof photo === 'number' ? (
-                    <Image source={photo} style={styles.propertyImage} resizeMode="cover" />
-                  ) : (
-                    <View style={styles.imagePlaceholder}>
-                      <Ionicons name="home" size={32} color="#A68B7B" />
-                    </View>
-                  )}
-                </View>
-
-                {/* Property Info - Inverted Colors */}
-                <View style={[styles.propertyInfo, styles.myListingInfo]}>
-                  <Text style={styles.myListingPrice}>${listing.price.toLocaleString()}</Text>
-                  <Text style={styles.myListingAddress}>{listing.address}</Text>
-                  <Text style={styles.myListingCityState}>
-                    {listing.city}, {listing.state}
-                  </Text>
-                  {(listing.bedrooms || listing.bathrooms) && (
-                    <View style={styles.detailsRow}>
-                      {listing.bedrooms && (
-                        <Text style={styles.myListingDetailText}>
-                          {listing.bedrooms} bed
-                        </Text>
-                      )}
-                      {listing.bedrooms && listing.bathrooms && (
-                        <Text style={styles.myListingDetailText}> • </Text>
-                      )}
-                      {listing.bathrooms && (
-                        <Text style={styles.myListingDetailText}>
-                          {listing.bathrooms} bath
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-              );
-            })}
-          </>
-        )}
-
-        {/* All User-Created Listings Section */}
-        {allUserListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 && (
-          <>
-            {myListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).length > 0 && <Text style={styles.sectionTitle}>All Listings</Text>}
-            {allUserListings.filter(l => !searchQuery.trim() || filteredListings.includes(l)).map((listing) => {
-              const photo = getListingPhoto(listing);
-              return (
-              <TouchableOpacity
-                key={listing.id}
-                style={[
-                  styles.propertyCard,
+                  isMyListing && styles.myListingCard,
                   selectedPropertyId === listing.id && styles.selectedCard,
                 ]}
                 onPress={() => handleListingPress(listing)}
@@ -370,24 +312,24 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
                 </View>
 
                 {/* Property Info */}
-                <View style={styles.propertyInfo}>
-                  <Text style={styles.price}>${listing.price.toLocaleString()}</Text>
-                  <Text style={styles.address}>{listing.address}</Text>
-                  <Text style={styles.cityState}>
+                <View style={[styles.propertyInfo, isMyListing && styles.myListingInfo]}>
+                  <Text style={isMyListing ? styles.myListingPrice : styles.price}>${listing.price.toLocaleString()}</Text>
+                  <Text style={isMyListing ? styles.myListingAddress : styles.address}>{listing.address}</Text>
+                  <Text style={isMyListing ? styles.myListingCityState : styles.cityState}>
                     {listing.city}, {listing.state}
                   </Text>
                   {(listing.bedrooms || listing.bathrooms) && (
                     <View style={styles.detailsRow}>
                       {listing.bedrooms && (
-                        <Text style={styles.detailText}>
+                        <Text style={isMyListing ? styles.myListingDetailText : styles.detailText}>
                           {listing.bedrooms} bed
                         </Text>
                       )}
                       {listing.bedrooms && listing.bathrooms && (
-                        <Text style={styles.detailText}> • </Text>
+                        <Text style={isMyListing ? styles.myListingDetailText : styles.detailText}> • </Text>
                       )}
                       {listing.bathrooms && (
-                        <Text style={styles.detailText}>
+                        <Text style={isMyListing ? styles.myListingDetailText : styles.detailText}>
                           {listing.bathrooms} bath
                         </Text>
                       )}

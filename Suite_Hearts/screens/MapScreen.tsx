@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Modal, Image, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,50 +34,59 @@ export default function MapScreen() {
   });
 
   // Fetch user listings from Supabase
-  useEffect(() => {
-    const fetchUserListings = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('listings')
-          .select('*')
-          .order('created_at', { ascending: false });
+  const fetchUserListings = React.useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*, listing_photos(photo_url, photo_order)')
+        .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching listings:', error);
-          return;
-        }
-
-        if (data) {
-          // Transform Supabase data to Listing format
-          const listings: Listing[] = data.map((item: any) => ({
-            id: item.id,
-            ownerId: item.owner_id,
-            title: item.title || '',
-            description: item.description || '',
-            address: item.address,
-            city: item.city,
-            state: item.state,
-            zipCode: item.zip_code || '',
-            price: item.price || 0,
-            latitude: item.latitude,
-            longitude: item.longitude,
-            photos: [], // Will be fetched separately if needed
-            bedrooms: item.bedrooms,
-            bathrooms: item.bathrooms,
-            squareFeet: item.square_feet,
-            availableDate: item.available_date,
-            createdAt: new Date(item.created_at).getTime(),
-            updatedAt: new Date(item.updated_at).getTime(),
-          }));
-          setUserListings(listings);
-        }
-      } catch (error) {
-        console.error('Error fetching user listings:', error);
+      if (error) {
+        console.error('Error fetching listings:', error);
+        return;
       }
-    };
 
-    fetchUserListings();
+      if (data) {
+        // Transform Supabase data to Listing format
+        const listings: Listing[] = data.map((item: any) => ({
+          id: item.id,
+          ownerId: item.owner_id,
+          title: item.title || '',
+          description: item.description || '',
+          address: item.address,
+          city: item.city,
+          state: item.state,
+          zipCode: item.zip_code || '',
+          price: item.price || 0,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          photos: (item.listing_photos || [])
+            .sort((a: any, b: any) => (a.photo_order ?? 0) - (b.photo_order ?? 0))
+            .map((p: any) => p.photo_url),
+          bedrooms: item.bedrooms,
+          bathrooms: item.bathrooms,
+          squareFeet: item.square_feet,
+          availableDate: item.available_date,
+          createdAt: new Date(item.created_at).getTime(),
+          updatedAt: new Date(item.updated_at).getTime(),
+        }));
+        setUserListings(listings);
+      }
+    } catch (error) {
+      console.error('Error fetching user listings:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchUserListings();
+  }, [fetchUserListings]);
+
+  // Refresh listings whenever this tab gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserListings();
+    }, [fetchUserListings])
+  );
 
   // Combine external properties and user listings
   const allProperties: MapProperty[] = [
