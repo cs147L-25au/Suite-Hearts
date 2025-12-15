@@ -91,118 +91,17 @@ export default function ProfileScreen() {
         (updates as any).spaceType = value;
       }
     } else if (field === 'maxRoommates') {
-      if (typeof value === 'string') {
-        updates.maxRoommates = value;
-      } else {
-        updates.maxRoommates = value;
-      }
+      updates.maxRoommates = typeof value === 'number' ? value : (typeof value === 'string' ? parseInt(value) || 0 : value);
     } else if (field === 'leaseDuration') {
-      if (typeof value === 'string') {
-        updates.leaseDuration = value;
-      } else {
-        updates.leaseDuration = value;
-      }
+      updates.leaseDuration = value;
     } else {
+      // For all other fields including friendliness, cleanliness, guestsAllowed
       (updates as any)[field] = value;
     }
 
-    // Update local state
+    // Update user - this handles both local state and Supabase
+    // updateUser in UserContext handles all the Supabase mapping
     await updateUser(currentUser.id, updates);
-
-    // Update Supabase
-    try {
-      const supabaseUpdates: any = {};
-      if (field === 'budget') {
-        supabaseUpdates.min_budget = value.minBudget;
-        supabaseUpdates.max_budget = value.maxBudget;
-      } else if (field === 'profilePicture') {
-        supabaseUpdates.profile_picture_url = value;
-      } else if (field === 'roommateType') {
-        supabaseUpdates.roommate_type = value.toLowerCase();
-      } else if (field === 'spaceType') {
-        // Store as JSON array if multiple selections
-        if (Array.isArray(value)) {
-          supabaseUpdates.space_type = JSON.stringify(value);
-        } else {
-          supabaseUpdates.space_type = value;
-        }
-      } else if (field === 'jobRole') {
-        supabaseUpdates.job_role = value;
-      } else if (field === 'jobPlace') {
-        supabaseUpdates.job_place = value;
-      } else if (field === 'maxRoommates') {
-        if (typeof value === 'string') {
-          supabaseUpdates.max_roommates = null; // Store as null for "I don't want roommates"
-        } else {
-          supabaseUpdates.max_roommates = value;
-        }
-      } else if (field === 'leaseDuration') {
-        if (typeof value === 'string') {
-          supabaseUpdates.lease_duration = null; // Store as null for "Under 1 month"
-        } else {
-          supabaseUpdates.lease_duration = value;
-        }
-      } else {
-        const fieldMap: Record<string, string> = {
-          age: 'age',
-          race: 'race',
-          gender: 'gender',
-          job: 'job',
-          university: 'university',
-          yearsExperience: 'years_experience',
-          hometown: 'hometown',
-          location: 'location',
-          smoking: 'smoking',
-          drinking: 'drinking',
-          drugs: 'drugs',
-          nightOwl: 'night_owl',
-          religion: 'religion',
-          bio: 'bio',
-          pets: 'pets',
-          preferredCity: 'preferred_city',
-          jobRole: 'job_role',
-          jobPlace: 'job_place',
-          friendliness: 'friendliness',
-          cleanliness: 'cleanliness',
-          guestsAllowed: 'guests_allowed',
-        };
-        
-        // Handle friendliness, cleanliness, and guestsAllowed specially
-        if (field === 'friendliness' || field === 'cleanliness') {
-          // These are numbers, save as INTEGER
-          supabaseUpdates[fieldMap[field]] = typeof value === 'number' ? value : parseInt(String(value)) || null;
-        } else if (field === 'guestsAllowed') {
-          // This is a text field
-          supabaseUpdates[fieldMap[field]] = value || null;
-        } else {
-          // For all other fields, use the standard mapping
-          supabaseUpdates[fieldMap[field] || field] = value;
-        }
-      }
-
-      // Validate that currentUser.id is a valid UUID format before updating
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(currentUser.id)) {
-        Alert.alert(
-          'Invalid User ID',
-          'Your user ID is in an old format. Please delete your profile and sign up again to fix this issue.'
-        );
-        return;
-      }
-
-      const { error } = await supabase
-        .from('users')
-        .update(supabaseUpdates)
-        .eq('id', currentUser.id);
-
-      if (error) {
-        console.error('Error updating user in Supabase:', error);
-        Alert.alert('Error', 'Failed to save changes. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error updating user:', error);
-      Alert.alert('Error', 'Failed to save changes. Please try again.');
-    }
 
     setEditingField(null);
   };
