@@ -18,6 +18,7 @@ import { RootStackParamList, Conversation } from "../types";
 import { useUser } from "../context/UserContext";
 import { supabase } from "../lib/supabase";
 import RoommatePromptModal from "../components/RoommatePromptModal";
+import { User } from "../types";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -106,27 +107,28 @@ export default function ChatScreen() {
   }, [allConversations, currentUser, matchedUserIds]);
 
   // Get all matched/contacted users for group creation
-  const availableContacts = useMemo(() => {
+  const availableContacts = useMemo<User[]>(() => {
+    if (!currentUser) return [];
     const contactIds = new Set<string>();
     allConversations.forEach((conv) => {
       conv.participants.forEach((id) => {
-        if (id !== currentUser.id) contactIds.add(id);
+        if (currentUser && id !== currentUser.id) contactIds.add(id);
       });
     });
     return Array.from(contactIds)
       .map((id) => getUserById(id))
-      .filter(Boolean);
-  }, [allConversations, currentUser.id, getUserById]);
+      .filter((u): u is User => !!u);
+  }, [allConversations, currentUser, getUserById]);
 
   // Filter conversations based on search (for Messages tab)
   const filteredAllConversations = useMemo(() => {
-    if (!searchQuery.trim()) return allConversations;
+    if (!currentUser || !searchQuery.trim()) return allConversations;
 
     const query = searchQuery.toLowerCase();
     return allConversations.filter((conv) => {
       // Search in participant names
       const participantNames = conv.participants
-        .filter((id) => id !== currentUser?.id)
+        .filter((id) => id !== currentUser.id)
         .map((id) => getUserById(id)?.name || "")
         .join(" ")
         .toLowerCase();
@@ -151,13 +153,13 @@ export default function ChatScreen() {
 
   // Filter matched conversations based on search (for Matches tab)
   const filteredMatchedConversations = useMemo(() => {
-    if (!searchQuery.trim()) return matchedConversations;
+    if (!currentUser || !searchQuery.trim()) return matchedConversations;
 
     const query = searchQuery.toLowerCase();
     return matchedConversations.filter((conv) => {
       // Search in participant names
       const participantNames = conv.participants
-        .filter((id) => id !== currentUser?.id)
+        .filter((id) => id !== currentUser.id)
         .map((id) => getUserById(id)?.name || "")
         .join(" ")
         .toLowerCase();
@@ -295,12 +297,10 @@ export default function ChatScreen() {
       : otherUsers[0]?.name || "Unknown";
     const isSelected = selectedConversations.has(item.id);
 
-    const hasMessages = item.lastMessage;
-    const lastMessageText = hasMessages
-      ? item.lastMessage.imageUrl
-        ? "📷 Photo"
-        : item.lastMessage.text
-      : null;
+    const lastMessage = item.lastMessage;
+    const lastMessageText = lastMessage?.imageUrl
+      ? "📷 Photo"
+      : lastMessage?.text ?? null;
 
     return (
       <TouchableOpacity
@@ -373,13 +373,13 @@ export default function ChatScreen() {
               <Text style={styles.conversationName} numberOfLines={1}>
                 {displayName}
               </Text>
-              {hasMessages && (
+              {lastMessage && (
                 <Text style={styles.timestamp}>
-                  {formatTimestamp(item.lastMessage.timestamp)}
+                  {formatTimestamp(lastMessage.timestamp)}
                 </Text>
               )}
             </View>
-            {hasMessages ? (
+            {lastMessage ? (
               <Text style={styles.lastMessage} numberOfLines={1}>
                 {lastMessageText}
               </Text>
@@ -446,7 +446,6 @@ export default function ChatScreen() {
                   accessibilityRole="button"
                   accessibilityState={isFocused ? { selected: true } : {}}
                   accessibilityLabel={options.tabBarAccessibilityLabel}
-                  testID={options.tabBarTestID}
                   onPress={onPress}
                   style={[
                     styles.customTabButton,
@@ -461,7 +460,7 @@ export default function ChatScreen() {
                       isGreyedOut && styles.customTabLabelGreyed,
                     ]}
                   >
-                    {label}
+                    {typeof label === "string" ? label : String(label)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -713,7 +712,7 @@ export default function ChatScreen() {
                 Select Members ({selectedGroupMembers.size}/4)
               </Text>
               <FlatList
-                data={availableContacts}
+                data={availableContacts as User[]}
                 keyExtractor={(user) => user.id}
                 renderItem={({ item: user }) => {
                   const isSelected = selectedGroupMembers.has(user.id);
