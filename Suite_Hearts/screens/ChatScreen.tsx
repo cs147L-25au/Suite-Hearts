@@ -407,7 +407,6 @@ export default function ChatScreen() {
     <View style={styles.container}>
       {/* Tab Navigator */}
       <Tab.Navigator
-        screenOptions={{ headerShown: false }}
         tabBar={(props) => (
           <View style={styles.customTabBar}>
             {props.state.routes.map((route, index) => {
