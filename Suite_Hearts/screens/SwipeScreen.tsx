@@ -413,7 +413,6 @@ export default function SwipeScreen() {
   return (
     <View style={[styles.container, { paddingTop: 50 }]}>
       <Tab.Navigator
-        screenOptions={{ headerShown: false }}
         tabBar={(props) => (
           <View style={styles.customTabBar}>
             {props.state.routes.map((route, index) => {
