@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList, Conversation } from '../types';
 import { useUser } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
+import RoommatePromptModal from '../components/RoommatePromptModal';
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -22,6 +23,9 @@ export default function ChatScreen() {
   const [groupName, setGroupName] = useState('');
   const [selectedGroupMembers, setSelectedGroupMembers] = useState<Set<string>>(new Set());
   const [matchedUserIds, setMatchedUserIds] = useState<Set<string>>(new Set());
+  const [showRoommatePrompt, setShowRoommatePrompt] = useState(false);
+  
+  const isHousingOnly = currentUser?.userType === 'searcher' && currentUser?.lookingFor === 'housing';
 
   // Fetch matches from Supabase
   useEffect(() => {
@@ -330,40 +334,6 @@ export default function ChatScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <View style={styles.headerActions}>
-          {isDeleteMode ? (
-            <>
-              <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMode}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.headerButton} 
-                onPress={handleDeleteSelected}
-                disabled={selectedConversations.size === 0}
-              >
-                <Ionicons 
-                  name="trash" 
-                  size={24} 
-                  color={selectedConversations.size > 0 ? '#FF3B30' : '#C7C7CC'} 
-                />
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMode}>
-                <Ionicons name="trash-outline" size={24} color="#6F4E37" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton} onPress={() => setShowGroupModal(true)}>
-                <Ionicons name="create-outline" size={24} color="#6F4E37" />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-
       {/* Tab Navigator */}
       <Tab.Navigator
         tabBar={(props) => (
@@ -378,7 +348,15 @@ export default function ChatScreen() {
 
               const isFocused = props.state.index === index;
 
+              const isMatchesTab = route.name === 'Matches';
+              const isGreyedOut = isHousingOnly && isMatchesTab;
+
               const onPress = () => {
+                if (isGreyedOut) {
+                  setShowRoommatePrompt(true);
+                  return;
+                }
+                
                 const event = props.navigation.emit({
                   type: 'tabPress',
                   target: route.key,
@@ -401,12 +379,14 @@ export default function ChatScreen() {
                   style={[
                     styles.customTabButton,
                     isFocused && styles.customTabButtonActive,
+                    isGreyedOut && styles.customTabButtonGreyed,
                   ]}
                 >
                   <Text
                     style={[
                       styles.customTabLabel,
                       isFocused && styles.customTabLabelActive,
+                      isGreyedOut && styles.customTabLabelGreyed,
                     ]}
                   >
                     {label}
@@ -417,24 +397,55 @@ export default function ChatScreen() {
           </View>
         )}
       >
-        <Tab.Screen name="Messages" options={{ tabBarLabel: 'Messages' }}>
+        <Tab.Screen name="Messages" options={{ tabBarLabel: 'All Conversations' }}>
           {() => (
             <View style={{ flex: 1 }}>
-              {/* Search Bar */}
-              <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search conversations, names, messages..."
-                  placeholderTextColor="#8E8E93"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Ionicons name="close-circle" size={20} color="#A68B7B" />
-                  </TouchableOpacity>
-                )}
+              {/* Search Bar and Action Buttons */}
+              <View style={styles.searchAndActionsContainer}>
+                <View style={styles.searchContainer}>
+                  <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search messages"
+                    placeholderTextColor="#8E8E93"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                      <Ionicons name="close-circle" size={20} color="#A68B7B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.headerActions}>
+                  {isDeleteMode ? (
+                    <>
+                      <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMode}>
+                        <Text style={styles.cancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.headerButton} 
+                        onPress={handleDeleteSelected}
+                        disabled={selectedConversations.size === 0}
+                      >
+                        <Ionicons 
+                          name="trash" 
+                          size={24} 
+                          color={selectedConversations.size > 0 ? '#FF3B30' : '#C7C7CC'} 
+                        />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMode}>
+                        <Ionicons name="trash-outline" size={24} color="#6F4E37" />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.headerButton} onPress={() => setShowGroupModal(true)}>
+                        <Ionicons name="create-outline" size={24} color="#6F4E37" />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               </View>
               {filteredAllConversations.length === 0 ? (
                 <View style={styles.emptyContainer}>
@@ -461,21 +472,52 @@ export default function ChatScreen() {
         <Tab.Screen name="Matches" options={{ tabBarLabel: 'Matches' }}>
           {() => (
             <View style={{ flex: 1 }}>
-              {/* Search Bar */}
-              <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search conversations, names, messages..."
-                  placeholderTextColor="#8E8E93"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Ionicons name="close-circle" size={20} color="#A68B7B" />
-                  </TouchableOpacity>
-                )}
+              {/* Search Bar and Action Buttons */}
+              <View style={styles.searchAndActionsContainer}>
+                <View style={styles.searchContainer}>
+                  <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="search messages"
+                    placeholderTextColor="#8E8E93"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                      <Ionicons name="close-circle" size={20} color="#A68B7B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.headerActions}>
+                  {isDeleteMode ? (
+                    <>
+                      <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMode}>
+                        <Text style={styles.cancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.headerButton} 
+                        onPress={handleDeleteSelected}
+                        disabled={selectedConversations.size === 0}
+                      >
+                        <Ionicons 
+                          name="trash" 
+                          size={24} 
+                          color={selectedConversations.size > 0 ? '#FF3B30' : '#C7C7CC'} 
+                        />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.headerButton} onPress={handleDeleteMode}>
+                        <Ionicons name="trash-outline" size={24} color="#6F4E37" />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.headerButton} onPress={() => setShowGroupModal(true)}>
+                        <Ionicons name="create-outline" size={24} color="#6F4E37" />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               </View>
               {filteredMatchedConversations.length === 0 ? (
                 <View style={styles.emptyContainer}>
@@ -576,6 +618,12 @@ export default function ChatScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Roommate Prompt Modal */}
+      <RoommatePromptModal
+        visible={showRoommatePrompt}
+        onClose={() => setShowRoommatePrompt(false)}
+      />
     </View>
   );
 }
@@ -585,23 +633,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  header: {
+  searchAndActionsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 20,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#FFF5E1',
-  },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: '#000000',
+    paddingVertical: 8,
+    gap: 8,
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
+    marginLeft: 'auto',
   },
   headerButton: {
     padding: 4,
@@ -614,13 +657,14 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    marginHorizontal: 16,
-    marginVertical: 8,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 20,
     gap: 8,
+    width: '75%',
+    borderWidth: 1,
+    borderColor: '#E8D5C4',
   },
   searchIcon: {
     marginRight: 4,
@@ -902,6 +946,9 @@ const styles = StyleSheet.create({
   customTabButtonActive: {
     backgroundColor: '#FF6B35',
   },
+  customTabButtonGreyed: {
+    opacity: 0.5,
+  },
   customTabLabel: {
     fontSize: 16,
     fontWeight: '600',
@@ -909,5 +956,8 @@ const styles = StyleSheet.create({
   },
   customTabLabelActive: {
     color: '#FFFFFF',
+  },
+  customTabLabelGreyed: {
+    color: '#C7C7CC',
   },
 });

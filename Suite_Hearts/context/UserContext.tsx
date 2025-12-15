@@ -32,6 +32,7 @@ interface UserContextType {
   removeLikedListing: (listingId: string) => Promise<void>;
   isListingLiked: (listingId: string) => boolean;
   syncUserFromSupabase: (userId: string, email: string) => Promise<void>;
+  convertUserAccountType: (userId: string, newLookingFor: 'both') => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -132,11 +133,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
         minBudget: data.min_budget ? Number(data.min_budget) : undefined,
         maxBudget: data.max_budget ? Number(data.max_budget) : undefined,
         leaseDuration: data.lease_duration || undefined,
-        friendliness: data.friendliness ? Number(data.friendliness) : undefined,
-        cleanliness: data.cleanliness ? Number(data.cleanliness) : undefined,
-        guestsAllowed: data.guests_allowed as 'never' | 'with permission' | 'always okay' | undefined,
+        friendliness: data.friendliness !== null && data.friendliness !== undefined ? Number(data.friendliness) : undefined,
+        cleanliness: data.cleanliness !== null && data.cleanliness !== undefined ? Number(data.cleanliness) : undefined,
+        guestsAllowed: data.guests_allowed ? (data.guests_allowed as 'never' | 'with permission' | 'always okay') : undefined,
         createdAt: new Date(data.created_at).getTime(),
       };
+      
+      console.log('📥 Synced from Supabase - friendliness:', syncedUser.friendliness, 'cleanliness:', syncedUser.cleanliness, 'guestsAllowed:', syncedUser.guestsAllowed);
 
       // Update current user and users array with synced data
       // Use functional update to ensure we have the latest state (including mock users)
@@ -295,6 +298,127 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
     
     await AsyncStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsers));
+
+    // Also update in Supabase
+    try {
+      const supabaseUpdates: any = {};
+      
+      // Map User fields to Supabase column names
+      if ('friendliness' in updates) {
+        const value = updates.friendliness;
+        if (value !== null && value !== undefined && value !== '') {
+          supabaseUpdates.friendliness = Number(value);
+        } else {
+          supabaseUpdates.friendliness = null;
+        }
+        console.log('💾 Saving friendliness to Supabase:', supabaseUpdates.friendliness, 'from:', value);
+      }
+      if ('cleanliness' in updates) {
+        const value = updates.cleanliness;
+        if (value !== null && value !== undefined && value !== '') {
+          supabaseUpdates.cleanliness = Number(value);
+        } else {
+          supabaseUpdates.cleanliness = null;
+        }
+        console.log('💾 Saving cleanliness to Supabase:', supabaseUpdates.cleanliness, 'from:', value);
+      }
+      if ('guestsAllowed' in updates) {
+        const value = updates.guestsAllowed;
+        supabaseUpdates.guests_allowed = (value && value !== '') ? value : null;
+        console.log('💾 Saving guestsAllowed to Supabase:', supabaseUpdates.guests_allowed, 'from:', value);
+      }
+      if ('minBudget' in updates) {
+        supabaseUpdates.min_budget = updates.minBudget !== null && updates.minBudget !== undefined 
+          ? Number(updates.minBudget) 
+          : null;
+      }
+      if ('maxBudget' in updates) {
+        supabaseUpdates.max_budget = updates.maxBudget !== null && updates.maxBudget !== undefined 
+          ? Number(updates.maxBudget) 
+          : null;
+      }
+      if ('maxRoommates' in updates) {
+        supabaseUpdates.max_roommates = updates.maxRoommates !== null && updates.maxRoommates !== undefined 
+          ? (typeof updates.maxRoommates === 'number' ? updates.maxRoommates : null)
+          : null;
+      }
+      if ('roommateType' in updates) {
+        supabaseUpdates.roommate_type = updates.roommateType || null;
+      }
+      if ('preferredCity' in updates) {
+        supabaseUpdates.preferred_city = updates.preferredCity || null;
+      }
+      if ('spaceType' in updates) {
+        if (Array.isArray(updates.spaceType)) {
+          supabaseUpdates.space_type = JSON.stringify(updates.spaceType);
+        } else {
+          supabaseUpdates.space_type = updates.spaceType || null;
+        }
+      }
+      if ('leaseDuration' in updates) {
+        supabaseUpdates.lease_duration = updates.leaseDuration !== null && updates.leaseDuration !== undefined
+          ? (typeof updates.leaseDuration === 'number' ? updates.leaseDuration : null)
+          : null;
+      }
+      if ('profilePicture' in updates) {
+        supabaseUpdates.profile_picture_url = updates.profilePicture || null;
+      }
+      if ('jobRole' in updates) {
+        supabaseUpdates.job_role = updates.jobRole || null;
+      }
+      if ('jobPlace' in updates) {
+        supabaseUpdates.job_place = updates.jobPlace || null;
+      }
+      if ('lookingFor' in updates) {
+        supabaseUpdates.looking_for = updates.lookingFor || null;
+      }
+      
+      // Standard field mappings
+      const fieldMap: Record<string, string> = {
+        age: 'age',
+        race: 'race',
+        gender: 'gender',
+        job: 'job',
+        university: 'university',
+        yearsExperience: 'years_experience',
+        hometown: 'hometown',
+        location: 'location',
+        smoking: 'smoking',
+        drinking: 'drinking',
+        drugs: 'drugs',
+        nightOwl: 'night_owl',
+        religion: 'religion',
+        bio: 'bio',
+        pets: 'pets',
+      };
+      
+      Object.keys(updates).forEach(key => {
+        if (key in fieldMap && !(key in supabaseUpdates)) {
+          supabaseUpdates[fieldMap[key]] = (updates as any)[key] || null;
+        }
+      });
+
+      // Only update Supabase if there are fields to update
+      if (Object.keys(supabaseUpdates).length > 0) {
+        const { error } = await supabase
+          .from('users')
+          .update(supabaseUpdates)
+          .eq('id', userId);
+
+        if (error) {
+          console.error('❌ Error updating user in Supabase:', error);
+          console.error('❌ Failed fields:', Object.keys(supabaseUpdates));
+          console.error('❌ Failed values:', supabaseUpdates);
+          // Don't throw - continue with local update even if Supabase fails
+        } else {
+          console.log('✅ Successfully updated user in Supabase:', Object.keys(supabaseUpdates));
+          console.log('✅ Updated values:', supabaseUpdates);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating user in Supabase:', error);
+      // Don't throw - continue with local update even if Supabase fails
+    }
   };
 
   const getUserById = (userId: string): User | undefined => {
@@ -397,9 +521,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
             minBudget: data.min_budget ? Number(data.min_budget) : undefined,
             maxBudget: data.max_budget ? Number(data.max_budget) : undefined,
             leaseDuration: data.lease_duration || undefined,
-            friendliness: data.friendliness ? Number(data.friendliness) : undefined,
-            cleanliness: data.cleanliness ? Number(data.cleanliness) : undefined,
-            guestsAllowed: data.guests_allowed as 'never' | 'with permission' | 'always okay' | undefined,
+            friendliness: data.friendliness !== null && data.friendliness !== undefined ? Number(data.friendliness) : undefined,
+            cleanliness: data.cleanliness !== null && data.cleanliness !== undefined ? Number(data.cleanliness) : undefined,
+            guestsAllowed: data.guests_allowed ? (data.guests_allowed as 'never' | 'with permission' | 'always okay') : undefined,
             createdAt: new Date(data.created_at).getTime(),
           };
 
@@ -785,6 +909,31 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return likedListings.includes(listingId);
   };
 
+  const convertUserAccountType = async (userId: string, newLookingFor: 'both') => {
+    // Update in Supabase
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ looking_for: newLookingFor })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('Error updating user account type in Supabase:', error);
+      }
+    } catch (error) {
+      console.error('Error updating user account type in Supabase:', error);
+    }
+
+    // Update local state
+    await updateUser(userId, { lookingFor: newLookingFor });
+    
+    // Update current user if it's the one being updated
+    if (currentUser?.id === userId) {
+      const updatedCurrentUser = { ...currentUser, lookingFor: newLookingFor };
+      await setCurrentUser(updatedCurrentUser);
+    }
+  };
+
   return (
     <UserContext.Provider
       value={{
@@ -810,6 +959,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         removeLikedListing,
         isListingLiked,
         syncUserFromSupabase,
+        convertUserAccountType,
       }}
     >
       {children}

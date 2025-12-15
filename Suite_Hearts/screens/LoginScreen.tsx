@@ -202,19 +202,18 @@ export default function LoginScreen({ navigation }: Props) {
           <Ionicons name="arrow-back" size={24} color="#6F4E37" />
         </TouchableOpacity>
 
-        {/* Logo/Title Section */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="home" size={48} color="#FF6B35" />
-          </View>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
-        </View>
-
         {/* Login Form */}
         <View style={styles.form}>
           {step === 'email' ? (
             <>
+              {/* Logo/Title Section - Only show on email step */}
+              <View style={styles.header}>
+                <View style={styles.logoContainer}>
+                  <Ionicons name="home" size={48} color="#FF6B35" />
+                </View>
+                <Text style={styles.title}>Welcome Back</Text>
+                <Text style={styles.subtitle}>Sign in to continue</Text>
+              </View>
               <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={20} color="#A68B7B" style={styles.inputIcon} />
                 <TextInput
@@ -425,6 +424,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6F4E37',
     paddingVertical: 16,
+    letterSpacing: 0,
   },
   loginButton: {
     backgroundColor: '#FF6B35',

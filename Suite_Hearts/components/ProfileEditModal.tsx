@@ -35,7 +35,7 @@ export default function ProfileEditModal({ visible, field, value, user, onClose,
   const isMaxBudgetScrolling = useRef<boolean>(false);
   const [jobRole, setJobRole] = useState<string>('');
   const [jobPlace, setJobPlace] = useState<string>('');
-  const [selectedRoommates, setSelectedRoommates] = useState<number | string>(1);
+  const [selectedRoommates, setSelectedRoommates] = useState<number | string>(0);
   const roommatesScrollRef = useRef<ScrollView>(null);
   const roommatesScrollInitialized = useRef<boolean>(false);
   const isRoommatesScrolling = useRef<boolean>(false);
@@ -86,19 +86,19 @@ export default function ProfileEditModal({ visible, field, value, user, onClose,
         setJobPlace(String(jobPlaceValue));
         setInputValue(String(jobPlaceValue));
       } else if (field === 'maxRoommates') {
-        let roommatesValue: string | number = 1;
+        let roommatesValue: string | number = 0;
         if (typeof value === 'string') {
           // Handle old "None" or "6+" values
           if (value === 'None') {
-            roommatesValue = 1;
+            roommatesValue = 0;
           } else if (value === '6+') {
             roommatesValue = 6;
           } else {
             const numValue = parseInt(value);
-            roommatesValue = isNaN(numValue) ? 1 : Math.max(1, Math.min(6, numValue));
+            roommatesValue = isNaN(numValue) ? 0 : Math.max(0, Math.min(6, numValue));
           }
         } else if (typeof value === 'number') {
-          roommatesValue = Math.max(1, Math.min(6, value));
+          roommatesValue = Math.max(0, Math.min(6, value));
         }
         setSelectedRoommates(roommatesValue);
       } else if (field === 'spaceType') {
@@ -119,9 +119,6 @@ export default function ProfileEditModal({ visible, field, value, user, onClose,
         } else {
           setSelectedSpaceTypes([]);
         }
-      } else if (field === 'friendliness') {
-        const friendlinessValue = typeof value === 'string' ? parseInt(value) : (value || 5);
-        setSelectedFriendliness(isNaN(friendlinessValue) ? 5 : Math.max(1, Math.min(10, friendlinessValue)));
       } else if (field === 'friendliness') {
         const friendlinessValue = typeof value === 'string' ? parseInt(value) : (value || 5);
         setSelectedFriendliness(isNaN(friendlinessValue) ? 5 : Math.max(1, Math.min(10, friendlinessValue)));
@@ -668,7 +665,7 @@ export default function ProfileEditModal({ visible, field, value, user, onClose,
     }
 
     if (config.type === 'roommatesPicker') {
-      const roommatesOptions = ['1', '2', '3', '4', '5', '6'];
+      const roommatesOptions = ['0', '1', '2', '3', '4', '5', '6'];
 
       return (
         <View style={styles.agePickerContainer}>

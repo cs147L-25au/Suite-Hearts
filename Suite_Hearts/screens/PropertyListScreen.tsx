@@ -245,23 +245,6 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
 
   return (
     <View style={styles.container}>
-      {/* Header with Liked Listings button - always show if there are any liked listings */}
-      <View style={styles.headerContainer}>
-        <View style={styles.placeholder} />
-        <Text style={styles.screenTitle}>Search</Text>
-        {likedListingsData.length > 0 ? (
-          <TouchableOpacity 
-            onPress={() => setShowLikedListings(true)}
-            style={styles.likedButton}
-          >
-            <Ionicons name="heart" size={20} color="#FF6B35" />
-            <Text style={styles.likedButtonText}>Liked Listings</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.placeholder} />
-        )}
-      </View>
-      
       {/* Liked Listings Row - Full width below header */}
       {likedListingsData.length > 0 && (
         <TouchableOpacity 
@@ -279,7 +262,7 @@ export default function PropertyListScreen({ onPropertySelect }: PropertyListScr
         <Ionicons name="search" size={20} color="#A68B7B" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by address, city, or state..."
+          placeholder="search listings"
           placeholderTextColor="#8E8E93"
           value={searchQuery}
           onChangeText={setSearchQuery}

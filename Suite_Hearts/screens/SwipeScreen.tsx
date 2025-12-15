@@ -11,6 +11,7 @@ import { getRecommendedRoommates, getRecommendedListings } from '../lib/recommen
 import { supabase } from '../lib/supabase';
 import { Property } from '../lib/datafiniti';
 import { getRandomRealEstatePhotos } from '../lib/photoUtils';
+import RoommatePromptModal from '../components/RoommatePromptModal';
 
 const Tab = createMaterialTopTabNavigator();
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -20,8 +21,8 @@ export default function SwipeScreen() {
   const { properties: datafinitiProperties } = useProperties();
   const [roommates, setRoommates] = useState<User[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [showRoommatePrompt, setShowRoommatePrompt] = useState(false);
 
-  // Check if profile is complete (required fields only - job and prompts are optional)
   const isProfileComplete = (user: User): boolean => {
     // Required fields: personal info, bio, and lifestyle preferences (friendliness, cleanliness, guestsAllowed are REQUIRED)
     const baseFields = ['age', 'race', 'gender', 'hometown', 'location', 'smoking', 'drinking', 'drugs', 'nightOwl', 'religion', 'bio', 'friendliness', 'cleanliness', 'guestsAllowed'];
@@ -308,8 +309,15 @@ export default function SwipeScreen() {
                 : route.name;
 
               const isFocused = props.state.index === index;
+              const isRoommatesTab = route.name === 'Roommates';
+              const isGreyedOut = isHousingOnly && isRoommatesTab;
 
               const onPress = () => {
+                if (isGreyedOut) {
+                  setShowRoommatePrompt(true);
+                  return;
+                }
+                
                 const event = props.navigation.emit({
                   type: 'tabPress',
                   target: route.key,
@@ -327,20 +335,21 @@ export default function SwipeScreen() {
                   accessibilityRole="button"
                   accessibilityState={isFocused ? { selected: true } : {}}
                   accessibilityLabel={options.tabBarAccessibilityLabel}
-                  testID={options.tabBarTestID}
                   onPress={onPress}
                   style={[
                     styles.customTabButton,
                     isFocused && styles.customTabButtonActive,
+                    isGreyedOut && styles.customTabButtonGreyed,
                   ]}
                 >
                   <Text
                     style={[
                       styles.customTabLabel,
                       isFocused && styles.customTabLabelActive,
+                      isGreyedOut && styles.customTabLabelGreyed,
                     ]}
                   >
-                    {label}
+                    {typeof label === 'string' ? label : String(label)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -1983,6 +1992,9 @@ const styles = StyleSheet.create({
   customTabButtonActive: {
     backgroundColor: '#FF6B35',
   },
+  customTabButtonGreyed: {
+    opacity: 0.5,
+  },
   customTabLabel: {
     fontSize: 16,
     fontWeight: '600',
@@ -1990,6 +2002,9 @@ const styles = StyleSheet.create({
   },
   customTabLabelActive: {
     color: '#FFFFFF',
+  },
+  customTabLabelGreyed: {
+    color: '#C7C7CC',
   },
   // Prompt Response Modal Styles (Hinge-style)
   promptModalContainer: {

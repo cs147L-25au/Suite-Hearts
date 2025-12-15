@@ -185,7 +185,13 @@ export default function ListingDetailScreen() {
           {photos.length > 0 ? (
             <>
               <Image
-                source={{ uri: photos[currentPhotoIndex] }}
+                source={
+                  typeof photos[currentPhotoIndex] === 'string' 
+                    ? { uri: photos[currentPhotoIndex] as string }
+                    : typeof photos[currentPhotoIndex] === 'number'
+                    ? photos[currentPhotoIndex] as number
+                    : photos[currentPhotoIndex] as { uri: string }
+                }
                 style={styles.photo}
                 resizeMode="cover"
               />

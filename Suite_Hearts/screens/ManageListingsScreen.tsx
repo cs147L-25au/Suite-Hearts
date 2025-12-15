@@ -1108,6 +1108,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 16,
   },
+  halfField: {
+    flex: 0.48,
+    marginBottom: 0,
+    paddingHorizontal: 0,
+  },
   thirdField: {
     flex: 1,
     marginBottom: 0,
@@ -1124,6 +1129,8 @@ const styles = StyleSheet.create({
   },
   halfInput: {
     width: '100%',
+    padding: 12,
+    fontSize: 16,
   },
   textArea: {
     minHeight: 100,

@@ -34,22 +34,22 @@ export default function ProfileScreen() {
         : null;
     }
     if (field === 'maxRoommates') {
-      // Return number 1-6 as string
+      // Return number 0-6 as string
       if (typeof currentUser.maxRoommates === 'number') {
-        return String(Math.max(1, Math.min(6, currentUser.maxRoommates)));
+        return String(Math.max(0, Math.min(6, currentUser.maxRoommates)));
       }
       if (typeof currentUser.maxRoommates === 'string') {
         // Handle old "None" or "6+" values
         if (currentUser.maxRoommates === 'None') {
-          return '1';
+          return '0';
         }
         if (currentUser.maxRoommates === '6+') {
           return '6';
         }
         const numValue = parseInt(currentUser.maxRoommates);
-        return isNaN(numValue) ? '1' : String(Math.max(1, Math.min(6, numValue)));
+        return isNaN(numValue) ? '0' : String(Math.max(0, Math.min(6, numValue)));
       }
-      return '1'; // Default to 1
+      return '0'; // Default to 0
     }
     if (field === 'leaseDuration') {
       if (typeof currentUser.leaseDuration === 'string') {
@@ -249,9 +249,9 @@ export default function ProfileScreen() {
       return Array.isArray(value) ? value.length > 0 : (value && value.toString().trim() !== '');
     }
     if (field === 'maxRoommates') {
-      // Handle string "None" or number
+      // Handle string "None" or number - accept 0 as valid
       const value = (currentUser as any)[field];
-      return value !== null && value !== undefined && value !== '';
+      return value !== null && value !== undefined && value !== '' && (typeof value === 'number' ? value >= 0 : true);
     }
     if (field === 'friendliness' || field === 'cleanliness') {
       // These are numbers 1-10 (REQUIRED)
@@ -282,7 +282,8 @@ export default function ProfileScreen() {
     }
     if (field === 'maxRoommates') {
       const value = (currentUser as any)[field];
-      return value === null || value === undefined || value === '';
+      // Accept 0 as valid, only reject null/undefined/empty string
+      return value === null || value === undefined || value === '' || (typeof value === 'number' && value < 0);
     }
     if (field === 'friendliness' || field === 'cleanliness') {
       const value = (currentUser as any)[field];

@@ -37,9 +37,7 @@ export default function SplashScreen() {
     // Wait for data to load and session check before navigating
     if (!isLoaded || checkingSession) return;
 
-    // GIF duration - adjust this based on your actual GIF length
-    // You can check your GIF duration and update this value
-    const GIF_DURATION = 3000; // 3 seconds - adjust to match your GIF's actual duration
+    const GIF_DURATION = 3000; // 3 seconds 
     const LAST_FRAME_DURATION = 1000; // 0.4 seconds on last frame
     
     // After GIF finishes playing, wait 0.4 seconds on last frame, then navigate
